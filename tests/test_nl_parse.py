@@ -43,6 +43,13 @@ def test_missing_fields_reported_and_second_category_noted():
     assert any("Фотограф" in n for n in r["notes"])
 
 
+def test_kazakh_wedding_suggests_language_and_toi_without_guessing():
+    r = parse("Нужен ведущий на казахскую свадьбу 14 ноября в Алматы до 800 тысяч")
+    assert r["params"]["event_type"] == "свадьба" and r["params"]["language"] is None
+    note = next(n for n in r["notes"] if "казахск" in n)
+    assert "«казахский»" in note and "«той»" in note
+
+
 def test_date_outside_calendar_is_flagged():
     r = parse("лайв-бэнд на свадьбу 5 января в Алматы 2 млн")
     assert any("вне календаря" in n for n in r["notes"])

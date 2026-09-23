@@ -18,6 +18,9 @@ CASES = [
     ("december", "Тот же запрос на декабрь", {"date": "2026-12-12"}, "partial", ["HK-76268"]),
     ("invalid", "Дата вне календаря", {"date": "2027-01-01"}, "invalid_request", []),
 ]
+NL_TEXT = "Нужен ведущий на казахскую свадьбу 14 ноября в Алматы, бюджет до 800 тысяч, часов на 6"
+NL_EXPECTED = dict(city="Алматы", date="2026-11-14", event_type="свадьба",
+                   category="Ведущий", budget=800000, duration=6, language=None)
 
 
 def word_form(count: int, one: str, few: str, many: str) -> str:
@@ -26,8 +29,12 @@ def word_form(count: int, one: str, few: str, many: str) -> str:
     return {1: one, 2: few, 3: few, 4: few}.get(count % 10, many)
 
 
-def post(base_url: str, body: dict) -> dict:
-    req = Request(base_url.rstrip("/") + "/api/match",
+def fmt_kzt(amount: int) -> str:
+    return f"{amount:,}".replace(",", " ") + " ₸"
+
+
+def post(base_url: str, body: dict, path: str = "/api/match") -> dict:
+    req = Request(base_url.rstrip("/") + path,
                   data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
                   headers={"Content-Type": "application/json"}, method="POST")
     with urlopen(req, timeout=45) as response:
@@ -49,12 +56,66 @@ def validate(data: dict, outcome: str, ids: list[str]) -> list[str]:
     return errors
 
 
+def show_match(data: dict) -> None:
+    print(f"outcome: {data.get('outcome')}\nmessage: {data.get('message')}")
+    funnel = data.get("funnel")
+    if funnel:
+        print("Воронка: " + " → ".join(
+            f"{step['count']} {step['step']}" for step in funnel
+        ))
+    for card in data.get("cards", []):
+        badge = " [синтетический профиль]" if card.get("synthetic") else ""
+        print(f"  {card['id']} · {card['name']}{badge} · от {fmt_kzt(card['price_from_kzt'])}")
+        print(f"  Почему: {card.get('explanation', '')}")
+        if card.get("explanation_source"):
+            print(f"  Источник объяснения: {card['explanation_source']}")
+    for excluded in data.get("excluded", []):
+        print(f"  Не попал {excluded['id']} · {excluded['name']}: {'; '.join(excluded['reasons'])}")
+    for hint in data.get("hints", []):
+        print(f"  Подсказка: {hint}")
+
+
+def check_nl(base_url: str, results: dict, failures: list[str]) -> None:
+    """Свободный текст → /api/ask: поля распознаны, неоднозначность показана, подбор выполнен."""
+    print(f"\n=== nl: Запрос свободным текстом ===\n{NL_TEXT}")
+    try:
+        data = post(base_url, {"text": NL_TEXT}, "/api/ask")
+    except HTTPError as exc:
+        print(f"HTTP {exc.code}: {exc.read().decode('utf-8', errors='replace')}")
+        failures.append("nl")
+        return
+    except (URLError, TimeoutError, OSError, ValueError) as exc:
+        print(f"API недоступен или ответ некорректен: {exc}")
+        failures.append("nl")
+        return
+    results["nl"] = {"request": {"text": NL_TEXT}, "response": data}
+    parsed, result = data.get("parsed") or {}, data.get("result") or {}
+    for item in parsed.get("found", []):
+        print(f"  понял: {item['field']} = {item['value']}  ← «{item['fragment']}»")
+    for note in parsed.get("notes", []):
+        print(f"  Уточнение: {note}")
+    if parsed.get("missing"):
+        print(f"  Не хватает: {', '.join(parsed['missing'])}")
+    show_match(result)
+    errors = [f"{key}: ожидалось {value}, получено {parsed.get('params', {}).get(key)}"
+              for key, value in NL_EXPECTED.items() if parsed.get("params", {}).get(key) != value]
+    if parsed.get("missing"):
+        errors.append(f"не распознаны: {', '.join(parsed['missing'])}")
+    if parsed.get("source") != "rules":
+        errors.append(f"источник разбора: ожидался rules, получен {parsed.get('source')}")
+    if not any("казахский" in note for note in parsed.get("notes", [])):
+        errors.append("нет подсказки о языке для «казахской свадьбы»")
+    errors.extend(validate(result, "partial", ["HK-44923"]))
+    failures.extend(f"nl: {error}" for error in errors)
+    print("FAIL: " + "; ".join(errors) if errors else "PASS")
+
+
 def main() -> int:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base-url", default="http://localhost:8000")
-    parser.add_argument("--case", choices=[x[0] for x in CASES], help="Запустить один сценарий")
+    parser.add_argument("--case", choices=[x[0] for x in CASES] + ["nl"], help="Запустить один сценарий")
     parser.add_argument("--save", type=Path, help="Сохранить фактические запросы и ответы в JSON")
     args = parser.parse_args()
     results, failures = {}, []
@@ -75,36 +136,22 @@ def main() -> int:
             failures.append(key)
             continue
         results[key] = {"request": body, "response": data}
-        print(f"outcome: {data.get('outcome')}\nmessage: {data.get('message')}")
-        funnel = data.get("funnel")
-        if funnel:
-            print("Воронка: " + " → ".join(
-                f"{step['count']} {step['step']}" for step in funnel
-            ))
-        for c in data.get("cards", []):
-            badge = " [синтетический профиль]" if c.get("synthetic") else ""
-            price = f"{c['price_from_kzt']:,}".replace(",", " ")
-            print(f"  {c['id']} · {c['name']}{badge} · от {price} ₸")
-            print(f"  Почему: {c.get('explanation', '')}")
-            if c.get("explanation_source"):
-                print(f"  Источник объяснения: {c['explanation_source']}")
-        for e in data.get("excluded", []):
-            print(f"  Не попал {e['id']} · {e['name']}: {'; '.join(e['reasons'])}")
-        for hint in data.get("hints", []):
-            print(f"  Подсказка: {hint}")
+        show_match(data)
         errors = validate(data, outcome, ids)
         if key == "none" and not data.get("excluded"):
             errors.append("ожидались причины исключения")
         failures.extend(f"{key}: {error}" for error in errors)
         print("FAIL: " + "; ".join(errors) if errors else "PASS")
     if "dense" in results and "december" in results:
-        october = {c["id"] for c in results["dense"]["response"]["cards"]}
-        busy = {e["id"] for e in results["december"]["response"]["excluded"]
-                if any("занят" in reason.lower() for reason in e["reasons"])}
+        october = {card["id"] for card in results["dense"]["response"]["cards"]}
+        busy = {excluded["id"] for excluded in results["december"]["response"]["excluded"]
+                if any("занят" in reason.lower() for reason in excluded["reasons"])}
         disappeared = sorted(october & busy)
         print(f"\nОктябрь → декабрь: заняты {', '.join(disappeared) or 'никто'}")
         if not october or not october.issubset(busy):
             failures.append("Смена даты: ожидалось исключение всех трёх октябрьских кандидатов по занятости")
+    if not args.case or args.case == "nl":
+        check_nl(args.base_url, results, failures)
     if args.save and not failures:
         args.save.parent.mkdir(parents=True, exist_ok=True)
         args.save.write_text(json.dumps(results, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
