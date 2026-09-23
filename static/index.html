@@ -3,83 +3,274 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
 <title>Beyonder — подбор подрядчиков</title>
 <style>
-  body { font-family: system-ui, sans-serif; max-width: 960px; margin: 0 auto; padding: 16px; background: #f7f5f2; color: #1f1b16; }
-  h1 { font-size: 20px; }
-  form { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; background: #fff; padding: 14px; border-radius: 10px; border: 1px solid #e7e1d8; }
-  label { display: flex; flex-direction: column; font-size: 12px; color: #7a7268; gap: 4px; }
-  input, select, button { font: inherit; padding: 6px 8px; border: 1px solid #d8d0c4; border-radius: 6px; }
-  button { background: #3f6fb3; color: #fff; border: 0; cursor: pointer; align-self: end; }
-  .msg { margin: 16px 0 8px; padding: 12px; border-radius: 8px; background: #fff; border-left: 4px solid #3f6fb3; }
-  .msg.none_match, .msg.no_category_in_city, .msg.invalid_request { border-left-color: #c0392b; }
-  .msg.partial { border-left-color: #d68910; }
-  .outcome { font-weight: 600; }
-  .cards { display: grid; gap: 12px; }
-  .card { background: #fff; border: 1px solid #e7e1d8; border-radius: 10px; padding: 14px; }
-  .card h3 { margin: 0 0 4px; font-size: 16px; }
-  .meta { font-size: 12px; color: #7a7268; }
-  .badge { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 999px; margin-left: 6px; background: #fdebd0; color: #7e5109; }
-  .expl { margin-top: 8px; }
-  details { margin-top: 12px; font-size: 13px; }
-  .hint { font-size: 13px; margin: 4px 0; }
+  :root { --ink:#173c35; --muted:#53675f; --paper:#f5f5ef; --line:#d8e1d9; --green:#176348; --accent:#e9eea9; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink); font:15px/1.55 system-ui,sans-serif; }
+  main { max-width:1180px; margin:auto; padding:26px 28px 64px; }
+  header { display:flex; justify-content:space-between; align-items:center; padding-bottom:22px; border-bottom:1px solid var(--line); gap:12px; }
+  .brand { font-size:23px; font-weight:800; letter-spacing:-1px; }
+  .brand span { color:var(--green); }
+  .eyebrow { text-transform:uppercase; font-size:11px; letter-spacing:1.8px; font-weight:750; }
+  .hero { padding:36px 0 26px; max-width:760px; }
+  h1 { font-size:clamp(30px,4vw,46px); line-height:1.12; letter-spacing:-1.6px; margin:10px 0 14px; }
+  h2 { font-size:20px; margin:0 0 8px; line-height:1.3; }
+  h3 { font-size:18px; line-height:1.3; margin:0; }
+  p { margin:0 0 12px; }
+  .muted, .meta { color:var(--muted); }
+  .meta { font-size:12px; }
+  .hero p { font-size:17px; max-width:630px; }
+  .panel { background:white; border:1px solid var(--line); border-radius:18px; padding:24px; }
+  form { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:16px; }
+  label { display:flex; flex-direction:column; gap:7px; font-size:13px; font-weight:650; }
+  input, select, button { font:inherit; border-radius:8px; min-height:44px; }
+  input, select { width:100%; min-width:0; color:var(--ink); background:#fff; border:1px solid #b8c8bd; padding:9px 10px; }
+  button { border:0; padding:10px 18px; color:#fff; background:var(--green); font-weight:700; cursor:pointer; }
+  button:hover:not(:disabled) { background:#104d38; }
+  button:disabled { opacity:.5; cursor:wait; }
+  button.secondary { background:#e6eee7; color:var(--ink); border:1px solid #bccfbf; }
+  button.secondary:hover:not(:disabled) { background:#d7e6da; }
+  button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible { outline:3px solid #c78313; outline-offset:3px; }
+  .submit { align-self:end; }
+  .form-note { margin-top:14px; }
+  .compare-bar { margin:18px 0 26px; display:flex; align-items:end; gap:14px; flex-wrap:wrap; }
+  .compare-bar label { width:180px; }
+  .compare-bar .meta { flex:1; min-width:180px; margin:0; padding-bottom:7px; }
+  #status { margin:14px 0; }
+  #status:empty { display:none; }
+  .notice { border-radius:10px; background:#e8efea; padding:12px 16px; }
+  .error { background:#fff0ee; color:#8f2b23; border:1px solid #e4b8b0; }
+  .results { display:grid; gap:22px; }
+  .results.comparing { grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start; }
+  .result { min-width:0; }
+  .result-head { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:12px; }
+  .result-head h2 { margin:0; }
+  .date-label { font-weight:750; font-size:18px; }
+  .outcome { border:1px solid var(--line); border-left:5px solid; border-radius:12px; padding:17px; margin:12px 0; }
+  .outcome h3 { font-size:16px; margin-bottom:6px; }
+  .outcome.found { background:#eaf4ed; border-left-color:#26714c; }
+  .outcome.partial { background:#fff6df; border-left-color:#ae720d; }
+  .outcome.no_category_in_city { background:#eff1fc; border-left-color:#566eae; }
+  .outcome.none_match { background:#fff0e8; border-left-color:#b85126; }
+  .outcome.invalid_request { background:#fcecec; border-left-color:#a93535; }
+  .hint { margin-top:9px; font-size:13px; }
+  .cards { display:grid; gap:13px; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:14px; padding:20px; overflow-wrap:anywhere; }
+  .card-top { display:flex; gap:12px; align-items:start; margin-bottom:10px; }
+  .rank { display:flex; align-items:center; justify-content:center; flex:0 0 30px; height:30px; border-radius:9px; background:var(--accent); font-weight:750; }
+  .price { font-size:19px; font-weight:750; margin:12px 0 8px; }
+  .price small { font-size:12px; font-weight:500; }
+  .tags { display:flex; gap:6px; flex-wrap:wrap; }
+  .badge { display:inline-block; border-radius:5px; padding:3px 7px; background:#edf2ee; color:#38584a; font-size:11px; font-weight:600; }
+  .badge.synthetic { background:#fff0cf; color:#805315; }
+  .badge.source { background:#f1eff8; color:#5c4c83; }
+  .why { border-top:1px solid var(--line); margin-top:14px; padding-top:12px; }
+  .why strong { display:block; font-size:12px; margin-bottom:5px; }
+  .why p { margin:0; font-size:14px; }
+  .busy-change { border-color:#d69059; background:#fffaf3; }
+  .change-note { background:#fff0d7; color:#79440e; border-radius:7px; padding:8px 10px; margin-top:12px; font-size:12px; font-weight:650; }
+  .funnel { padding:15px 0; }
+  .funnel ol { display:flex; flex-wrap:wrap; gap:8px; list-style:none; padding:0; margin:8px 0 0; }
+  .funnel li { background:white; padding:6px 9px; border:1px solid var(--line); border-radius:7px; font-size:12px; }
+  .funnel li + li::before { content:'→'; margin-right:8px; color:var(--muted); }
+  .funnel b { font-size:16px; }
+  details { background:#fff; border:1px solid var(--line); border-radius:12px; padding:15px; margin-top:16px; }
+  summary { cursor:pointer; font-weight:700; font-size:14px; }
+  .excluded { list-style:none; padding:0; margin:10px 0 0; }
+  .excluded li { padding:12px 0; border-top:1px solid var(--line); font-size:13px; }
+  .excluded p { margin:5px 0 0; }
+  .excluded .busy-change { padding:12px; border-radius:8px; }
+  .empty { padding:22px 0; color:var(--muted); }
+  footer { border-top:1px solid var(--line); margin-top:36px; padding-top:18px; font-size:12px; color:var(--muted); }
+  [hidden] { display:none !important; }
+  @media(max-width:850px) { form { grid-template-columns:repeat(2,minmax(0,1fr)); } .results.comparing { grid-template-columns:1fr; } }
+  @media(max-width:500px) { main { padding:18px 16px 36px; } .panel { padding:16px; } form { grid-template-columns:1fr; } header .eyebrow { font-size:9px; } .compare-bar label, .compare-bar button { width:100%; } .hero { padding-top:26px; } }
 </style>
 </head>
 <body>
-<h1>Подбор event-подрядчиков</h1>
-<form id="f">
-  <label>Город <select name="city"></select></label>
-  <label>Дата <input type="date" name="date" required></label>
-  <label>Тип мероприятия <select name="event_type"></select></label>
-  <label>Категория <select name="category"></select></label>
-  <label>Бюджет, ₸ <input type="number" name="budget" min="1" step="any" value="800000" required></label>
-  <label>Длительность, ч <input type="number" name="duration" min="1" max="24" placeholder="необязательно"></label>
-  <label>Язык <select name="language"><option value="">любой</option></select></label>
-  <button type="submit">Подобрать</button>
-</form>
-<div id="out"></div>
+<main>
+  <header><div class="brand">beyonder<span>↗</span></div><div class="eyebrow">Событие начинается с людей</div></header>
+  <section class="hero" aria-labelledby="title">
+    <div class="eyebrow">Умный подбор подрядчиков</div>
+    <h1>Ваше событие.<br>Три подходящих варианта.</h1>
+    <p class="muted">Укажите условия — мы проверим доступность и бюджет, а затем объясним, почему подходит каждый подрядчик.</p>
+  </section>
+  <section class="panel" aria-label="Условия подбора">
+    <form id="f">
+      <label>Город <select name="city" required></select></label>
+      <label>Дата <input type="date" name="date" required></label>
+      <label>Тип мероприятия <select name="event_type" required></select></label>
+      <label>Категория <select name="category" required></select></label>
+      <label>Бюджет, ₸ <input type="number" name="budget" min="1" step="any" value="800000" required inputmode="numeric"></label>
+      <label>Длительность, ч <input type="number" name="duration" min="1" step="1" placeholder="Необязательно"></label>
+      <label>Язык <select name="language"><option value="">Любой</option></select></label>
+      <button id="submit" class="submit" type="submit" disabled>Подобрать подрядчиков</button>
+    </form>
+    <p class="meta form-note" id="catalog-note">Загружаем каталог…</p>
+    <button class="secondary" id="retry-meta" type="button" hidden>Повторить загрузку каталога</button>
+  </section>
+  <section class="compare-bar" aria-label="Сравнение дат">
+    <label>Другая дата <input id="compare-date" type="date" required></label>
+    <button id="compare" class="secondary" type="button" disabled>Сравнить с другой датой</button>
+    <p class="meta">Сначала подберите подрядчиков. При сравнении изменится только дата — остальные условия останутся теми же.</p>
+  </section>
+  <div id="status" role="status" aria-live="polite"></div>
+  <div id="out" class="results" aria-live="polite" aria-busy="false">
+    <p class="empty">Заполните условия, чтобы увидеть подборку и причины выбора.</p>
+  </div>
+  <footer>Демонстрационный каталог HackAlem AI · Анонимизированные данные.<br>Подбор не является бронированием. Цены указаны «от»; доступность и итоговую стоимость нужно подтвердить у подрядчика.</footer>
+</main>
 <script>
-const OUTCOME = {
-  found: "Подобрали",
-  partial: "Подходящих меньше трёх",
-  no_category_in_city: "В этом городе такой категории нет",
-  none_match: "Кандидаты есть, но ни один не проходит по условиям",
-  invalid_request: "Запрос вне календаря",
+'use strict';
+const OUTCOMES = {
+  found: ['found', '✓ Нашли три подходящих варианта'],
+  partial: ['partial', '◐ Подходит меньше трёх — покажем всех'],
+  no_category_in_city: ['no_category_in_city', '⌕ В этом городе нет такой категории'],
+  none_match: ['none_match', '∅ Никто не прошёл ваши условия'],
+  invalid_request: ['invalid_request', '! Не можем проверить эту дату']
 };
-const f = document.getElementById("f"), out = document.getElementById("out");
-const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const kzt = v => v.toLocaleString("ru-RU") + " ₸";
+const STEP_LABELS = {pool:'В городе и категории', category_city:'В городе и категории', initial:'В городе и категории',
+  date:'Свободны', available:'Свободны', availability:'Свободны', budget:'В бюджете', format:'По формату',
+  event_type:'По формату', language:'По языку', duration:'По длительности', ranked:'После ранжирования', top:'В подборке', shown:'Показаны'};
+const f = document.getElementById('f'), out = document.getElementById('out');
+const status = document.getElementById('status'), submit = document.getElementById('submit');
+const compare = document.getElementById('compare'), compareDate = document.getElementById('compare-date');
+const retryMeta = document.getElementById('retry-meta'), catalogNote = document.getElementById('catalog-note');
+const field = name => f.elements.namedItem(name);
+const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const list = value => Array.isArray(value) ? value : [];
+const money = value => Number.isFinite(Number(value)) ? Number(value).toLocaleString('ru-RU') + ' ₸' : 'не указана';
+const dateLabel = value => /^\d{4}-\d{2}-\d{2}$/.test(value || '') ? value.split('-').reverse().join('.') : String(value || '');
+const synthetic = c => c.synthetic ? '<span class="badge synthetic">синтетический профиль</span>' : '';
+let ready = false, pending = false, lastRequest = null, generation = 0, active = null;
 
-fetch("/api/meta").then(r => r.json()).then(m => {
-  const fill = (name, items) => items.forEach(v => f[name].add(new Option(v, v)));
-  fill("city", m.cities); fill("event_type", m.event_types); fill("category", m.categories); fill("language", m.languages);
-  f.date.min = m.date_min; f.date.max = m.date_max; f.date.value = "2026-10-10";
-});
-
-f.addEventListener("submit", async e => {
-  e.preventDefault();
-  const fd = Object.fromEntries(new FormData(f));
-  const body = { city: fd.city, date: fd.date, event_type: fd.event_type, category: fd.category,
-                 budget: Number(fd.budget), duration: fd.duration ? Number(fd.duration) : null, language: fd.language || null };
-  out.innerHTML = "<p>Подбираем…</p>";
-  const r = await fetch("/api/match", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-  const d = await r.json();
-  if (!r.ok) { out.innerHTML = `<div class="msg none_match">${esc(d.detail?.[0]?.msg || d.detail || "Ошибка запроса")}</div>`; return; }
-  let html = `<div class="msg ${d.outcome}"><div class="outcome">${OUTCOME[d.outcome]}</div>${esc(d.message)}` +
-             d.hints.map(h => `<div class="hint">→ ${esc(h)}</div>`).join("") + `</div>`;
-  html += `<div class="cards">` + d.cards.map(c => `
-    <div class="card">
-      <h3>${esc(c.name)}${c.synthetic ? '<span class="badge">синтетический профиль</span>' : ""}</h3>
-      <div class="meta">${esc(c.categories.join(", "))} · ${esc(c.city)} · от ${kzt(c.price_from_kzt)}</div>
-      <div class="expl">${esc(c.explanation)}</div>
-    </div>`).join("") + `</div>`;
-  if (d.excluded.length) {
-    html += `<details><summary>Не попали в выдачу (${d.excluded.length}) — почему</summary><ul>` +
-      d.excluded.map(x => `<li><b>${esc(x.name)}</b>${x.synthetic ? " (синт.)" : ""}: ${esc(x.reasons.join("; "))}</li>`).join("") +
-      `</ul></details>`;
+function buttons() { submit.disabled = !ready || pending; compare.disabled = !ready || pending || !lastRequest; }
+function note(text, error = false) { status.className = text ? 'notice' + (error ? ' error' : '') : ''; status.textContent = text; }
+function apiError(data) {
+  if (Array.isArray(data.detail)) return data.detail.map(x => `${list(x.loc).slice(1).join('.')}: ${x.msg || 'некорректное значение'}`).join('; ');
+  return typeof data.detail === 'string' ? data.detail : 'Не удалось выполнить запрос. Проверьте условия и повторите.';
+}
+async function fetchJSON(url, options = {}) {
+  const response = await fetch(url, options);
+  let data;
+  try { data = await response.json(); } catch { throw new Error('Сервер вернул некорректный ответ. Попробуйте ещё раз.'); }
+  if (!response.ok) throw new Error(apiError(data));
+  return data;
+}
+async function loadMeta() {
+  ready = false; buttons(); retryMeta.hidden = true;
+  const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), 15000);
+  try {
+    const m = await fetchJSON('/api/meta', {signal:controller.signal});
+    for (const [name, values] of [['city',m.cities],['event_type',m.event_types],['category',m.categories],['language',m.languages]]) {
+      field(name).replaceChildren();
+      if (name === 'language') field(name).add(new Option('Любой',''));
+      list(values).forEach(value => field(name).add(new Option(value,value)));
+    }
+    if (!list(m.cities).length || !list(m.categories).length || !list(m.event_types).length) throw new Error('Каталог пуст. Повторите загрузку позже.');
+    for (const input of [field('date'), compareDate]) { input.min = m.date_min || ''; input.max = m.date_max || ''; }
+    const inRange = d => (!m.date_min || d >= m.date_min) && (!m.date_max || d <= m.date_max);
+    field('date').value = inRange('2026-10-10') ? '2026-10-10' : m.date_min || '';
+    compareDate.value = inRange('2026-12-12') ? '2026-12-12' : m.date_max || '';
+    if (list(m.cities).includes('Алматы')) field('city').value = 'Алматы';
+    if (list(m.categories).includes('Фотограф')) field('category').value = 'Фотограф';
+    if (list(m.event_types).includes('свадьба')) field('event_type').value = 'свадьба';
+    catalogNote.textContent = `${m.profiles ?? '—'} профилей · Календарь ${dateLabel(m.date_min)} — ${dateLabel(m.date_max)} · Бюджет в целых тенге`;
+    ready = true; note('');
+  } catch (error) {
+    catalogNote.textContent = 'Каталог не загружен'; retryMeta.hidden = false;
+    note(error.name === 'AbortError' ? 'Сервер не ответил вовремя. Повторите загрузку.' : error.message, true);
+  } finally { clearTimeout(timeout); buttons(); }
+}
+function readRequest() {
+  field('budget').setCustomValidity(Number.isSafeInteger(Number(field('budget').value)) ? '' : 'Укажите бюджет целым числом тенге.');
+  field('duration').setCustomValidity(!field('duration').value || Number.isSafeInteger(Number(field('duration').value)) ? '' : 'Укажите целое число часов.');
+  if (!f.reportValidity()) return null;
+  const d = Object.fromEntries(new FormData(f));
+  return {city:d.city,date:d.date,event_type:d.event_type,category:d.category,budget:Number(d.budget),
+    duration:d.duration ? Number(d.duration) : null,language:d.language || null};
+}
+function busyChanges(from, to) {
+  const shown = new Set(list(to.cards).map(c => c.id));
+  const excluded = new Map(list(to.excluded).map(c => [c.id,c]));
+  return list(from.cards).filter(c => !shown.has(c.id) && list(excluded.get(c.id)?.reasons).some(r => /занят/i.test(String(r))));
+}
+function funnelHTML(data) {
+  const stages = list(data.funnel).filter(s => s && Number.isFinite(s.count) && s.count >= 0);
+  if (!stages.length) return '';
+  return '<div class="funnel"><strong class="meta">Как сузился выбор</strong><ol>' + stages.map(s =>
+    `<li><b>${esc(s.count)}</b> ${esc(STEP_LABELS[s.step] || s.step)}</li>`).join('') + '</ol></div>';
+}
+function cardHTML(c, index, changed, otherDate) {
+  const source = c.explanation_source === 'llm' ? 'AI-объяснение' : c.explanation_source === 'template' ? 'Объяснение по данным' : '';
+  return `<article class="card${changed ? ' busy-change' : ''}">
+    <div class="card-top"><span class="rank" aria-label="Место ${index+1}">${index+1}</span><div><h3>${esc(c.name)}</h3><div class="meta">${esc(c.city)} · ${esc(list(c.categories).join(', '))}</div></div></div>
+    <div class="tags">${synthetic(c)}${c.city_imputed ? '<span class="badge">город восстановлен</span>' : ''}${source ? `<span class="badge source">${source}</span>` : ''}</div>
+    <div class="price"><small>от</small> ${esc(money(c.price_from_kzt))}${c.price_imputed ? ' <span class="badge">оценочная цена</span>' : ''}</div>
+    <div class="meta">${esc(list(c.languages).join(' · '))}${c.max_hours != null ? ` · до ${esc(c.max_hours)} ч` : ''}</div>
+    <div class="why"><strong>Почему этот подрядчик</strong><p>${esc(c.explanation || 'Объяснение пока недоступно.')}</p></div>
+    ${changed ? `<p class="change-note">На ${esc(dateLabel(otherDate))} занят — не попал в другую подборку.</p>` : ''}
+  </article>`;
+}
+function resultHTML(data, request, other, otherRequest) {
+  const [kind,title] = OUTCOMES[data.outcome] || ['invalid_request','Неизвестный результат'];
+  const lost = new Set(other ? busyChanges(data,other).map(c => c.id) : []);
+  const arrivedBusy = new Set(other ? busyChanges(other,data).map(c => c.id) : []);
+  const excluded = list(data.excluded);
+  return `<section class="result" aria-label="Подборка на ${esc(dateLabel(request.date))}">
+    <div class="result-head"><h2>Подборка на ${esc(dateLabel(request.date))}</h2><span class="badge">${list(data.cards).length} из 3</span></div>
+    <p class="meta">${esc(request.city)} · ${esc(request.category)} · ${esc(request.event_type)} · до ${esc(money(request.budget))}${request.duration ? ` · ${esc(request.duration)} ч` : ''}${request.language ? ` · ${esc(request.language)}` : ''}</p>
+    <div class="outcome ${kind}"><h3>${title}</h3><div>${esc(data.message)}</div>${list(data.hints).map(h => `<div class="hint">→ ${esc(h)}</div>`).join('')}</div>
+    ${funnelHTML(data)}
+    <div class="cards">${list(data.cards).map((c,i) => cardHTML(c,i,lost.has(c.id),otherRequest?.date)).join('')}</div>
+    ${excluded.length ? `<details${arrivedBusy.size ? ' open' : ''}><summary>Не попали — почему (${excluded.length})</summary><ul class="excluded">${excluded.map(c =>
+      `<li${arrivedBusy.has(c.id) ? ' class="busy-change"' : ''}><strong>${esc(c.name)}</strong> ${synthetic(c)}<p>${esc(list(c.reasons).join('; '))}</p>${arrivedBusy.has(c.id) ? '<span class="change-note">Был в подборке на другую дату; сейчас занят</span>' : ''}</li>`).join('')}</ul></details>` : ''}
+  </section>`;
+}
+async function run(request, secondDate = null) {
+  const current = ++generation;
+  active?.abort(); const controller = new AbortController(); active = controller;
+  const timeout = setTimeout(() => controller.abort(),45000);
+  pending = true; buttons(); out.setAttribute('aria-busy','true'); note(secondDate ? 'Сравниваем одинаковые условия на две даты…' : 'Проверяем условия…');
+  const send = body => fetchJSON('/api/match',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:controller.signal});
+  try {
+    const secondRequest = secondDate ? {...request,date:secondDate} : null;
+    const results = await Promise.all(secondRequest ? [send(request),send(secondRequest)] : [send(request)]);
+    if (current !== generation) return;
+    if (results.some(d => !d || !Array.isArray(d.cards) || !d.outcome)) throw new Error('Ответ сервера не содержит результатов подбора.');
+    lastRequest = {...request}; out.className = secondDate ? 'results comparing' : 'results';
+    out.innerHTML = resultHTML(results[0],request,results[1],secondRequest) + (secondRequest ? resultHTML(results[1],secondRequest,results[0],request) : '');
+    if (secondRequest) {
+      const lost = busyChanges(results[0],results[1]);
+      note(lost.length ? `На ${dateLabel(secondDate)} из первой подборки заняты: ${lost.map(c => c.name).join(', ')}. Они подсвечены.` : 'Сравнение готово. Среди первой подборки нет подтверждённых исключений из-за занятости на вторую дату.');
+    } else note('');
+  } catch (error) {
+    if (current !== generation) return;
+    note(error.name === 'AbortError' ? 'Сервер не ответил за 45 секунд. Повторите запрос.' : error.message, true);
+  } finally {
+    clearTimeout(timeout);
+    if (current === generation) { pending = false; active = null; buttons(); out.setAttribute('aria-busy','false'); }
   }
-  out.innerHTML = html;
+}
+f.addEventListener('input', () => {
+  field('budget').setCustomValidity(''); field('duration').setCustomValidity('');
+  if (lastRequest || pending) {
+    generation++; active?.abort(); active = null; pending = false; lastRequest = null;
+    out.className = 'results'; out.innerHTML = ''; out.setAttribute('aria-busy','false');
+    note('Условия изменились. Нажмите «Подобрать подрядчиков», чтобы обновить результат.'); buttons();
+  }
 });
+f.addEventListener('submit', event => { event.preventDefault(); const request = readRequest(); if (request) run(request); });
+compareDate.addEventListener('input', () => compareDate.setCustomValidity(''));
+compare.addEventListener('click', () => {
+  if (!lastRequest || pending) return;
+  compareDate.setCustomValidity(compareDate.value === lastRequest.date ? 'Выберите другую дату для сравнения.' : '');
+  if (compareDate.reportValidity()) run({...lastRequest},compareDate.value);
+});
+retryMeta.addEventListener('click',loadMeta);
+loadMeta();
 </script>
 </body>
 </html>
