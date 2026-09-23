@@ -16,7 +16,7 @@ import pytest
 
 from app import explain_llm as llm
 from app.data import load_catalog
-from app.matcher import Candidate, MatchRequest, _explanation_facts, _score, fmt_kzt, match
+from app.matcher import Candidate, MatchRequest, _explanation_facts, _score, match
 
 
 @pytest.fixture
@@ -30,6 +30,7 @@ def isolated_cache():
 def bundle(monkeypatch, isolated_cache):
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.setenv("EXPLANATIONS_LLM_ENABLED", "true")
+    monkeypatch.setenv("LLM_PROVIDER", "openai")
     monkeypatch.setenv("OPENAI_MODEL", "test-model")
     monkeypatch.setattr(llm, "CACHE_FILE", isolated_cache)
     llm._MEMORY.clear()
@@ -50,8 +51,7 @@ def bundle(monkeypatch, isolated_cache):
                "facts_by_id": {c.c.id: _explanation_facts(c, req, shown) for c in shown}}
     payload = {"request": asdict(req), "context": {k: context[k] for k in ("pool_size", "busy_in_pool")},
                "cards": [context["facts_by_id"][c["id"]] for c in cards]}
-    texts = [f"Цена от {fmt_kzt(f['price_from_kzt'])} — {f['budget_percent']}% бюджета; {f['comparisons'][0]}."
-             for f in payload["cards"]]
+    texts = [card["explanation"] for card in cards]
     monkeypatch.setenv("OPENAI_API_KEY", "test-only-never-sent")
     return SimpleNamespace(cards=cards, req=req, context=context, payload=payload,
                            texts=texts, catalog=catalog, raw=json.dumps({"explanations": texts}, ensure_ascii=False))
@@ -119,6 +119,32 @@ def test_no_key_or_disabled_never_calls_sdk(bundle, fake_sdk, monkeypatch):
     assert calls == []
 
 
+def test_nvidia_provider_uses_compatible_endpoint_and_separate_cache(bundle, fake_sdk, monkeypatch):
+    calls, clients = fake_sdk([bundle.raw])
+    monkeypatch.setenv("LLM_PROVIDER", "nvidia")
+    monkeypatch.setenv("NVIDIA_API_KEY", "test-only-never-sent")
+    monkeypatch.setenv("NVIDIA_MODEL", "test-model")
+    assert llm.rewrite(bundle.cards, bundle.req, bundle.context) == bundle.texts
+    assert clients[0]["base_url"] == "https://integrate.api.nvidia.com/v1"
+    assert calls[0]["max_tokens"] == 1200
+    assert "response_format" not in calls[0]
+    monkeypatch.setenv("LLM_PROVIDER", "openai")
+    assert llm.rewrite(bundle.cards, bundle.req, bundle.context) == bundle.texts
+    assert len(calls) == 2  # одинаковая модель другого провайдера не даёт cache hit
+
+
+def test_nvidia_missing_key_or_model_stays_on_templates(bundle, fake_sdk, monkeypatch):
+    calls, _ = fake_sdk([bundle.raw])
+    monkeypatch.setenv("LLM_PROVIDER", "nvidia")
+    monkeypatch.delenv("NVIDIA_API_KEY", raising=False)
+    monkeypatch.setenv("NVIDIA_MODEL", "test-model")
+    assert llm.rewrite(bundle.cards, bundle.req, bundle.context) is None
+    monkeypatch.setenv("NVIDIA_API_KEY", "test-only-never-sent")
+    monkeypatch.delenv("NVIDIA_MODEL", raising=False)
+    assert llm.rewrite(bundle.cards, bundle.req, bundle.context) is None
+    assert calls == []
+
+
 def test_validation_retry_includes_errors(bundle, fake_sdk):
     calls, _ = fake_sdk(["not JSON", bundle.raw])
     assert llm.rewrite(bundle.cards, bundle.req, bundle.context) == bundle.texts
@@ -172,6 +198,18 @@ def test_validator_rejects_duplicates_and_extra_fields(bundle):
     assert llm._validate(json.dumps({"explanations": bundle.texts, "extra": 1}), bundle.payload, bundle.cards)[1]
 
 
+@pytest.mark.parametrize(("text", "expected_error"), [
+    ("Цена от 1 300 000 ₸. В описании — «работает с крупнейшими брендами».", "начни с причины"),
+    ("В описании — «работает с крупнейшими брендами». Свободен 23 сентября; цена от 1 300 000 ₸.", "общая занятость"),
+    ("В описании — «работает с крупнейшими брендами». Цена от 1 300 000 ₸. " + "Очень " * 40, "220 символов"),
+])
+def test_validator_enforces_v2_presentation(bundle, text, expected_error):
+    texts = [text, *bundle.texts[1:]]
+    value, errors = llm._validate(json.dumps({"explanations": texts}), bundle.payload, bundle.cards)
+    assert value is None
+    assert any(expected_error in error for error in errors)
+
+
 @pytest.mark.parametrize("pronoun", ["он", "Она"])
 def test_validator_rejects_gendered_pronouns_outside_quotes(bundle, pronoun):
     texts = [bundle.texts[0] + f" {pronoun} берёт этот формат.", *bundle.texts[1:]]
@@ -185,11 +223,11 @@ def test_validator_rejects_gendered_pronouns_outside_quotes(bundle, pronoun):
     "Она ведёт свадьбы на казахском языке",
     "Он ведёт свадьбы на казахском языке",
 ])
-def test_validator_accepts_description_quote_without_digits(quote):
+def test_validator_accepts_description_quote_before_price(quote):
     cards = [{"id": "one", "name": "Имя"}]
     payload = {"request": {}, "context": {}, "cards": [{"price_from_kzt": 100,
                "comparisons": [], "description_quote": quote}]}
-    raw = json.dumps({"explanations": [f"В описании: «{quote}»."]})
+    raw = json.dumps({"explanations": [f"В описании: «{quote}». Цена от 100 ₸."]})
     assert llm._validate(raw, payload, cards)[1] == []
 
 
