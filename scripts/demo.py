@@ -11,7 +11,7 @@ from urllib.request import Request, urlopen
 BASE = dict(city="Алматы", date="2026-10-10", event_type="свадьба",
             category="Фотограф", budget=800000, duration=None, language=None)
 CASES = [
-    ("dense", "Плотная категория: фотографы", {}, "found", ["HK-30583", "HK-16628", "HK-53108"]),
+    ("dense", "Плотная категория: фотографы", {}, "found", ["HK-30583", "HK-53108", "HK-16628"]),
     ("rare", "Редкая категория: флористы", {"category": "Флорист"}, "partial", ["HK-39372"]),
     ("no-category", "Лайв-бэнд в Астане", {"city": "Астана", "category": "Лайв-бэнд"}, "no_category_in_city", []),
     ("none", "Бюджет исключает всех", {"budget": 1}, "none_match", []),

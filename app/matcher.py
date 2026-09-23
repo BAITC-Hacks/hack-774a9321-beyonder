@@ -15,6 +15,7 @@ from datetime import date, timedelta
 
 from .data import CALENDAR_END, CALENDAR_START, Contractor
 from . import explain_llm
+from . import semantic
 
 MAX_CARDS = 3
 FILTER_ORDER = ("busy", "budget", "format", "language", "duration")
@@ -80,7 +81,9 @@ class Candidate:
 
 def _sentences(text: str) -> list[str]:
     parts = re.split(r"(?<=[.!?])\s+|\n+", text)
-    return [p.strip() for p in parts if len(p.strip()) > 15]
+    # Для индекса нужны и короткие предложения; неполезные цитаты ниже
+    # отсеиваются отдельно по длине и содержанию.
+    return [p.strip() for p in parts if p.strip()]
 
 
 def _marker_hits(text: str, event_type: str) -> int:
@@ -119,9 +122,17 @@ def _check(c: Contractor, req: MatchRequest) -> list[tuple[str, str]]:
 def _score(cand: Candidate, req: MatchRequest) -> None:
     c = cand.c
     budget = max(0.0, 1.0 - c.price / req.budget)  # «цена от» — запас по бюджету ценен
-    cand.snippet, cand.marker_hits = _best_snippet(c.description, req.event_type)
-    specialist = 0.3 if len(c.formats) <= 2 else 0.0
-    relevance = min(1.0, cand.marker_hits / 3) * 0.7 + specialist
+    if semantic.INDEX is None:
+        cand.snippet, cand.marker_hits = _best_snippet(c.description, req.event_type)
+        specialist = 0.3 if len(c.formats) <= 2 else 0.0
+        relevance = min(1.0, cand.marker_hits / 3) * 0.7 + specialist
+        semantic_score = 0.0
+    else:
+        ranked = semantic.ranked_sentences(semantic.INDEX, c.id, c.description, req.event_type)
+        cand.snippet = ranked[0][0] if ranked else None
+        cand.marker_hits = 0
+        semantic_score = ranked[0][1] if ranked else 0.0
+        relevance = semantic_score
     if req.duration and c.max_hours is not None:
         hours = min(1.0, (c.max_hours - req.duration) / 4)
     elif c.max_hours is None:
@@ -130,9 +141,9 @@ def _score(cand: Candidate, req: MatchRequest) -> None:
         hours = 0.5
     language = 1.0 if req.language else len(c.languages) / 3
     data_quality = 1.0 - 0.5 * c.price_imputed - 0.5 * c.city_imputed
-    cand.parts = {"budget": budget, "relevance": relevance, "hours": hours,
-                  "language": language, "data_quality": data_quality}
-    cand.score = round(sum(WEIGHTS[k] * v for k, v in cand.parts.items()), 6)
+    cand.parts = {"budget": budget, "relevance": relevance, "semantic": semantic_score,
+                  "hours": hours, "language": language, "data_quality": data_quality}
+    cand.score = round(sum(WEIGHTS[k] * cand.parts[k] for k in WEIGHTS), 6)
 
 
 def _nearest_free(c: Contractor, d: date) -> date | None:
@@ -180,10 +191,20 @@ def _description_quote(cand: Candidate, req: MatchRequest, shown: list[Candidate
     """Дословное свидетельство формата, опыта или масштаба длиной до 100 знаков."""
     others = [o.c.description.casefold() for o in shown if o is not cand]
     venue = req.category in VENUE_CATEGORIES
+    semantic_scores = dict(semantic.ranked_sentences(
+        semantic.INDEX, cand.c.id, cand.c.description, req.event_type))
     options = []
     for position, sentence in enumerate(_sentences(cand.c.description)):
         if CONTEXT_DEPENDENT_LEAD.match(sentence):
             continue
+        if others and any(sentence.casefold() in desc for desc in others):
+            continue
+        semantic_score = semantic_scores.get(sentence)
+        first_person = bool(re.search(
+            r"\b(?:я|мы|мне|меня|нас|нам|наш\w*|мо[йяеи]|работаем|снимаем|"
+            r"созда[её]м|организуем|предлагаем|прославляем)\b", sentence, re.I))
+        letters = [ch for ch in sentence if ch.isalpha()]
+        all_caps = bool(letters and sum(ch.isupper() for ch in letters) / len(letters) > 0.6)
         fragments = ([sentence] if len(sentence) <= 100 else
                      [part.strip() for part in re.split(
                          r"[,;:]|(?=\b(?:Финалист|Резидент|Ведущий|Организатор|"
@@ -207,7 +228,7 @@ def _description_quote(cand: Candidate, req: MatchRequest, shown: list[Candidate
             if (len(fragment) < 16 or "«" in fragment or "»" in fragment
                     or explain_llm.has_generic_phrase(fragment)):
                 continue
-            event_hits = _marker_hits(fragment, req.event_type)
+            event_hits = _marker_hits(fragment, req.event_type) if semantic.INDEX is None else 0
             capacity = bool(re.search(
                 r"\b\d+\s*(?:гост(?:ей|я|ь)?|человек|мест)\b|"
                 r"\b(?:вместимост[ьи]|зал\s+на)\b.{0,30}\b\d+", fragment, re.I,
@@ -228,15 +249,31 @@ def _description_quote(cand: Candidate, req: MatchRequest, shown: list[Candidate
                 r"песн|репертуар|выступ|коллектив|концерт|перформанс|хит",
                 fragment, re.I,
             ))
-            if not (event_hits or scale or subject or quantitative):
+            if not (event_hits or scale or subject or quantitative or semantic_score is not None):
                 continue
             unique = all(fragment.casefold() not in desc for desc in others)
             action = bool(re.search(r"работа|снима|вед[её]|явля|специализ|реализ|организ|оформл", fragment, re.I))
             music_detail = bool(req.category in {"Лайв-бэнд", "Национальный ансамбль"}
                                 and re.search(r"репертуар|хит|песн|вокал|состав|выступ", fragment, re.I))
-            options.append(((unique, bool(venue and capacity), quantitative,
+            venue_identity = bool(venue and re.search(
+                r"\b(?:ресторан\w*|локаци\w*|площадк\w*|отел\w*|"
+                r"курорт\w*|гольф|банкетн\w* зал)\b",
+                fragment, re.I))
+            original_rank = (bool(venue and capacity), quantitative,
                              bool(event_hits and action), scale, bool(event_hits), music_detail,
-                             subject, -position, -len(fragment)), fragment))
+                             subject, -position, -len(fragment))
+            # Косинус задаёт основу; содержательные доказательства (числа, репертуар,
+            # тип и масштаб площадки) важнее общего «профессиональный коллектив».
+            quote_score = (semantic_score or 0.0) + (0.30 if venue_identity else 0.0)
+            quote_score += 0.30 if quantitative else 0.0
+            quote_score += 0.26 if venue and capacity else 0.0
+            quote_score += 0.22 if music_detail else 0.0
+            quote_score += 0.04 if fragment[:1].isupper() else 0.0
+            quote_score -= 0.08 if first_person else 0.0
+            quote_score -= 0.07 if all_caps else 0.0
+            ranking = ((unique, round(quote_score, 6), *original_rank)
+                       if semantic.INDEX is not None else (unique, *original_rank))
+            options.append((ranking, fragment))
     return max(options, default=((), None))[1]
 
 
