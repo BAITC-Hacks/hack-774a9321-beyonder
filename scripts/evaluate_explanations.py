@@ -60,6 +60,8 @@ def main() -> int:
                     print(f"  {card['id']} [{source}, {len(explanation)} знаков] {explanation}")
                     if source != "llm":
                         errors.append(f"{name}/{card['id']}: LLM недоступен или ответ отклонён")
+                    if not isinstance(card.get("highlights"), list) or not card["highlights"]:
+                        errors.append(f"{name}/{card['id']}: отсутствуют highlights")
                     if len(explanation) > 220 or not 1 <= explain_llm._sentence_count(explanation) <= 2:
                         errors.append(f"{name}/{card['id']}: нарушена длина объяснения")
                 if len({card["explanation"] for card in data["cards"]}) != len(data["cards"]):

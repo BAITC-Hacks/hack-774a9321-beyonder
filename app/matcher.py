@@ -34,6 +34,12 @@ FORMAT_MARKERS: dict[str, list[str]] = {
     "день рождения": [r"дн[яеь] рождени", r"день рождени", r"детск", r"вечеринк"],
 }
 
+VENUE_CATEGORIES = {"Банкетный зал", "Ресторан", "Отель", "Загородная площадка"}
+CONTEXT_DEPENDENT_LEAD = re.compile(
+    r"^(?:такой|такая|такое|такие|этот|эта|это|эти|он|она|они|там|поэтому|"
+    r"его|её|ее|их|который|которая|которое|которые)\b", re.I,
+)
+
 WEIGHTS = {"budget": 0.40, "relevance": 0.30, "hours": 0.15, "language": 0.10, "data_quality": 0.05}
 
 
@@ -173,17 +179,27 @@ def _comparisons(cand: Candidate, shown: list[Candidate]) -> list[str]:
 def _description_quote(cand: Candidate, req: MatchRequest, shown: list[Candidate]) -> str | None:
     """Дословное свидетельство формата, опыта или масштаба длиной до 100 знаков."""
     others = [o.c.description.casefold() for o in shown if o is not cand]
+    venue = req.category in VENUE_CATEGORIES
     options = []
     for position, sentence in enumerate(_sentences(cand.c.description)):
+        if CONTEXT_DEPENDENT_LEAD.match(sentence):
+            continue
         fragments = ([sentence] if len(sentence) <= 100 else
-                     [part.strip() for part in re.split(r"[,;:]", sentence)])
+                     [part.strip() for part in re.split(
+                         r"[,;:]|(?=\b(?:Финалист|Резидент|Ведущий|Организатор|"
+                         r"Участник|Сценарист)\b)", sentence,
+                     )])
         for fragment in fragments:
-            fragment = re.sub(r"^(?:Он|Она|Они)\s+", "", fragment.strip(), flags=re.I)
+            fragment = fragment.strip()
+            if CONTEXT_DEPENDENT_LEAD.match(fragment):
+                continue
             fragment = re.sub(rf"^{re.escape(cand.c.name)}\s*[—–-]\s*", "", fragment, flags=re.I)
             named_lead = re.match(r"^([^—–-]{2,40})\s+[—–]\s+(.+)$", fragment)
             if named_lead and len(named_lead[1].split()) <= 4 and all(
                     word[0].isupper() for word in named_lead[1].split()):
                 fragment = named_lead[2]
+            if CONTEXT_DEPENDENT_LEAD.match(fragment):
+                continue
             if len(fragment) > 100:
                 fragment = fragment[:101].rsplit(" ", 1)[0]
                 fragment = re.sub(r"(?:\s+(?:и|с|со|на|для|по|в|от|из))+$", "", fragment)
@@ -192,19 +208,34 @@ def _description_quote(cand: Candidate, req: MatchRequest, shown: list[Candidate
                     or explain_llm.has_generic_phrase(fragment)):
                 continue
             event_hits = _marker_hits(fragment, req.event_type)
+            capacity = bool(re.search(
+                r"\b\d+\s*(?:гост(?:ей|я|ь)?|человек|мест)\b|"
+                r"\b(?:вместимост[ьи]|зал\s+на)\b.{0,30}\b\d+", fragment, re.I,
+            ))
+            ranking = bool(re.search(r"\b(?:топ|top)\s*[-–]?\s*\d+", fragment, re.I))
+            quantitative = ranking or bool(re.search(
+                r"\b\d+\s*(?:лет|года?|свадеб|мероприяти\w*|заказ\w*|"
+                r"проект\w*|съ[её]м\w*)\b", fragment, re.I,
+            )) or bool(req.category in {"Лайв-бэнд", "Национальный ансамбль"}
+                       and re.search(r"\b\d{2,4}-х\b", fragment))
             scale = bool(re.search(r"\b\d+\s*(?:лет|год|заказ|проект|событ)|\b(?:семи|пяти|десяти)\s+лет\b|\bопыт", fragment, re.I))
             subject = bool(re.search(
                 r"фотограф|флорист|цветочн|оформлен|съ[её]мк|снима|вед[её]т|дизайн|"
                 r"музык|заказ|команд|клиент|стаж|лет|ресторан|банкет|отел|площадк|"
                 r"локац|террас|панорам|кухн|интерьер|гор[аые]|вилл|декор|подар|"
-                r"сувенир|танц|ансамбл|шоу|сцен|звук|артист|видео|свет|гост|зал",
+                r"сувенир|танц|ансамбл|шоу|сцен|звук|артист|видео|свет|гост|зал|"
+                r"преми|финалист|резидент|сценарист|ведущ|форум|конференц|квн|"
+                r"песн|репертуар|выступ|коллектив|концерт|перформанс|хит",
                 fragment, re.I,
             ))
-            if not (event_hits or scale or subject):
+            if not (event_hits or scale or subject or quantitative):
                 continue
             unique = all(fragment.casefold() not in desc for desc in others)
             action = bool(re.search(r"работа|снима|вед[её]|явля|специализ|реализ|организ|оформл", fragment, re.I))
-            options.append(((bool(event_hits and action), scale, bool(event_hits), unique,
+            music_detail = bool(req.category in {"Лайв-бэнд", "Национальный ансамбль"}
+                                and re.search(r"репертуар|хит|песн|вокал|состав|выступ", fragment, re.I))
+            options.append(((unique, bool(venue and capacity), quantitative,
+                             bool(event_hits and action), scale, bool(event_hits), music_detail,
                              subject, -position, -len(fragment)), fragment))
     return max(options, default=((), None))[1]
 
@@ -222,7 +253,8 @@ def _explanation_facts(cand: Candidate, req: MatchRequest, shown: list[Candidate
     }
 
 
-def _explain(cand: Candidate, req: MatchRequest, facts: dict) -> str:
+def _explain(cand: Candidate, req: MatchRequest, facts: dict,
+             common_max_hours: int | None) -> str:
     c = cand.c
     comparison = next((part for part in facts["comparisons"] if "₸" in part), None)
     if comparison is None:
@@ -238,12 +270,13 @@ def _explain(cand: Candidate, req: MatchRequest, facts: dict) -> str:
         if len(quote) > limit:
             quote = quote[:limit + 1].rsplit(" ", 1)[0].rstrip(".!?… ")
         first = f"В описании — «{quote}»."
-    elif req.duration and c.max_hours is not None:
+    elif req.duration and c.max_hours is not None and c.max_hours != common_max_hours:
         first = f"До {c.max_hours} ч на площадке при запросе на {req.duration} ч."
-    elif req.language:
-        first = f"Работает {LANG_INSTR.get(req.language, req.language)}."
-    elif c.max_hours is not None:
+    elif c.max_hours is not None and c.max_hours != common_max_hours:
         first = f"До {c.max_hours} ч на площадке."
+    elif any(part.startswith("единственный в подборке работает") for part in facts["comparisons"]):
+        first = next(part.capitalize() + "." for part in facts["comparisons"]
+                     if part.startswith("единственный в подборке работает"))
     elif len(c.formats) == 1:
         first = f"В профиле указан только формат «{req.event_type}»."
     else:
@@ -253,7 +286,29 @@ def _explain(cand: Candidate, req: MatchRequest, facts: dict) -> str:
     return f"{first} {second}"
 
 
-def _card(cand: Candidate, explanation: str) -> dict:
+def _highlights(cand: Candidate, req: MatchRequest, facts: dict,
+                common_max_hours: int | None) -> list[str]:
+    """Короткие проверяемые факты карточки, без условий, общих для всей выдачи."""
+    items = []
+    if facts["description_quote"]:
+        items.append(f"Из описания: «{facts['description_quote']}»")
+    if cand.c.max_hours is not None and cand.c.max_hours != common_max_hours:
+        hours = f"До {cand.c.max_hours} ч на площадке"
+        if req.duration:
+            hours += f" при запросе {req.duration} ч"
+        items.append(hours)
+    language = next((part for part in facts["comparisons"]
+                     if part.startswith("единственный в подборке работает")), None)
+    if language:
+        items.append(language.capitalize())
+    price = f"Цена от {fmt_kzt(cand.c.price)}"
+    if cand.c.price_imputed:
+        price += " (оценочная)"
+    items.append(price)
+    return items[:3]
+
+
+def _card(cand: Candidate, explanation: str, highlights: list[str]) -> dict:
     c = cand.c
     return {
         "id": c.id,
@@ -272,6 +327,7 @@ def _card(cand: Candidate, explanation: str) -> dict:
         "score_parts": {k: round(v, 3) for k, v in cand.parts.items()},
         "explanation": explanation,
         "explanation_source": "template",
+        "highlights": highlights,
     }
 
 
@@ -361,7 +417,19 @@ def match(req: MatchRequest, catalog: list[Contractor]) -> dict:
 
     busy_in_pool = sum(1 for p in pool if req.date in p.c.busy)
     facts = {p.c.id: _explanation_facts(p, req, shown) for p in shown}
-    cards = [_card(p, _explain(p, req, facts[p.c.id])) for p in shown]
+    common_max_hours = (shown[0].c.max_hours if len(shown) > 1
+                        and shown[0].c.max_hours is not None
+                        and all(p.c.max_hours == shown[0].c.max_hours for p in shown)
+                        else None)
+    shared_quote = None
+    if len(shown) > 1:
+        quotes = [facts[p.c.id]["description_quote"] for p in shown]
+        if quotes[0] and all(quote == quotes[0] for quote in quotes):
+            shared_quote = quotes[0]
+            for fact in facts.values():
+                fact["description_quote"] = None
+    cards = [_card(p, _explain(p, req, facts[p.c.id], common_max_hours),
+                   _highlights(p, req, facts[p.c.id], common_max_hours)) for p in shown]
     # Не выдумываем различия между полностью совпадающими профилями.
     texts = [card["explanation"] for card in cards]
     for card in cards:
@@ -382,7 +450,20 @@ def match(req: MatchRequest, catalog: list[Contractor]) -> dict:
     occupancy = (f"в категории и городе {busy_in_pool} из {len(pool)} "
                  f"{_plural(busy_in_pool, 'занят', 'заняты', 'заняты')}.")
     shared = (f"На {fmt_date(req.date)} все показанные профили свободны и берут формат "
-              f"«{req.event_type}»; {occupancy}")
+              f"«{req.event_type}»")
+    if req.language:
+        shared += f", работают {LANG_INSTR.get(req.language, req.language)}"
+    shared += f"; {occupancy}"
+    if len(shown) > 1:
+        common_languages = set.intersection(*(set(p.c.languages) for p in shown))
+        if len(common_languages) > 1 and not req.language:
+            shared += (" У всех показанных профилей указаны языки: "
+                       + ", ".join(sorted(common_languages)) + ".")
+    if common_max_hours is not None:
+        shared += (f" У всех показанных профилей максимум {common_max_hours} ч на площадке"
+                   + (f" при запросе {req.duration} ч." if req.duration else "."))
+    if shared_quote:
+        shared += f" Во всех показанных описаниях — «{shared_quote}»."
     other_reasons = _reason_summary(failed, req)
     if not shown:
         outcome = "none_match"

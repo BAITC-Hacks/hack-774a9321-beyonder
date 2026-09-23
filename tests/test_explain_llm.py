@@ -168,6 +168,15 @@ def test_api_error_does_not_retry_and_match_still_works(bundle, fake_sdk):
     assert len(calls) == 1
 
 
+def test_debug_shows_failure_type_without_leaking_key(bundle, fake_sdk, monkeypatch, capsys):
+    fake_sdk([RuntimeError("test-only-never-sent must not appear")])
+    monkeypatch.setenv("LLM_DEBUG", "1")
+    assert llm.rewrite(bundle.cards, bundle.req, bundle.context) is None
+    output = capsys.readouterr().err
+    assert "[LLM_DEBUG] RuntimeError" in output
+    assert "test-only-never-sent" not in output
+
+
 def test_match_marks_llm_source_without_changing_order(bundle, fake_sdk):
     fake_sdk([bundle.raw])
     result = match(bundle.req, bundle.catalog)
@@ -218,17 +227,69 @@ def test_validator_rejects_gendered_pronouns_outside_quotes(bundle, pronoun):
     assert any("не угадывай род" in error for error in errors)
 
 
-@pytest.mark.parametrize("quote", [
-    "Ведёт свадьбы на казахском языке",
-    "Она ведёт свадьбы на казахском языке",
-    "Он ведёт свадьбы на казахском языке",
-])
-def test_validator_accepts_description_quote_before_price(quote):
+def test_validator_accepts_description_quote_before_price():
+    quote = "Ведёт свадьбы на казахском языке"
     cards = [{"id": "one", "name": "Имя"}]
     payload = {"request": {}, "context": {}, "cards": [{"price_from_kzt": 100,
                "comparisons": [], "description_quote": quote}]}
     raw = json.dumps({"explanations": [f"В описании: «{quote}». Цена от 100 ₸."]})
     assert llm._validate(raw, payload, cards)[1] == []
+
+
+@pytest.mark.parametrize("lead", ["Такой", "Этот", "Он", "Она", "Там", "Поэтому"])
+def test_validator_rejects_contextless_quote(lead):
+    quote = f"{lead} ведёт свадьбы на казахском языке"
+    cards = [{"id": "one", "name": "Имя"}]
+    payload = {"request": {}, "context": {}, "cards": [{"price_from_kzt": 100,
+               "comparisons": [], "description_quote": quote}]}
+    raw = json.dumps({"explanations": [f"В описании: «{quote}». Цена от 100 ₸."]})
+    assert "цитата начинается без контекста" in llm._validate(raw, payload, cards)[1][0]
+
+
+def test_validator_rejects_common_hours_as_first_reason():
+    cards = [{"id": "one", "name": "Первый"}, {"id": "two", "name": "Второй"}]
+    payload = {"request": {"duration": 6}, "context": {}, "cards": [
+        {"price_from_kzt": 100, "max_hours": 8, "comparisons": [], "description_quote": None},
+        {"price_from_kzt": 200, "max_hours": 8, "comparisons": [], "description_quote": None},
+    ]}
+    raw = json.dumps({"explanations": [
+        "До 8 ч на площадке при запросе 6 ч. Цена от 100 ₸.",
+        "До 8 ч на площадке при запросе 6 ч. Цена от 200 ₸.",
+    ]})
+    assert any("общий лимит часов" in error for error in llm._validate(raw, payload, cards)[1])
+
+
+@pytest.mark.parametrize("lead", ["Мы работаем", "Я снимаю", "Веду", "Создаём"])
+def test_validator_rejects_first_person_outside_quote(lead):
+    cards = [{"id": "one", "name": "Имя"}]
+    payload = {"request": {}, "context": {}, "cards": [{"price_from_kzt": 100,
+               "comparisons": [], "description_quote": None}]}
+    raw = json.dumps({"explanations": [f"{lead} на свадьбах. Цена от 100 ₸."]})
+    assert any("первое лицо" in error for error in llm._validate(raw, payload, cards)[1])
+
+
+def test_validator_requires_russian_quote_marks():
+    cards = [{"id": "one", "name": "Имя"}]
+    quote = "Более 5 лет снимаем свадьбы"
+    payload = {"request": {}, "context": {}, "cards": [{"price_from_kzt": 100,
+               "comparisons": [], "description_quote": quote}]}
+    raw = json.dumps({"explanations": [f'В описании: "{quote}". Цена от 100 ₸.']})
+    assert any("ёлочках" in error for error in llm._validate(raw, payload, cards)[1])
+
+
+def test_validator_rejects_shared_languages_as_first_reason():
+    cards = [{"id": "one", "name": "Первый"}, {"id": "two", "name": "Второй"}]
+    payload = {"request": {}, "context": {}, "cards": [
+        {"price_from_kzt": 100, "languages": ["казахский", "русский"],
+         "comparisons": [], "description_quote": None},
+        {"price_from_kzt": 200, "languages": ["казахский", "русский"],
+         "comparisons": [], "description_quote": None},
+    ]}
+    raw = json.dumps({"explanations": [
+        "Отличается языками: казахский и русский. Цена от 100 ₸.",
+        "Работает на казахском и русском. Цена от 200 ₸.",
+    ]})
+    assert any("языки общие" in error for error in llm._validate(raw, payload, cards)[1])
 
 
 def test_total_timeout_includes_validation_retry(bundle, fake_sdk, monkeypatch):

@@ -45,6 +45,8 @@ def test_determinism_and_card_contract(req, catalog):
                   "city_imputed", "score", "score_parts", "explanation"}
     assert all(old_fields <= c.keys() for c in first["cards"])
     assert all(c["explanation_source"] == "template" for c in first["cards"])
+    assert all(isinstance(c["highlights"], list) and c["highlights"]
+               for c in first["cards"])
 
 
 def test_busy_contractors_never_shown(req, catalog):
@@ -169,6 +171,67 @@ def test_venue_cards_lead_with_distinct_details(catalog):
     assert all(lead.startswith("В описании — «") for lead in leads)
     assert any("панорамная локация" in lead for lead in leads)
     assert any("казахской кухни" in lead for lead in leads)
+
+
+def test_shared_venue_hours_move_to_message_and_capacity_leads(catalog):
+    ids = {"HK-58236", "HK-90011"}
+    venues = [replace(c, busy=frozenset()) for c in catalog if c.id in ids]
+    req = MatchRequest("Алматы", date(2026, 10, 10), "свадьба", "Банкетный зал",
+                       5_000_000, duration=6)
+    result = match(req, venues)
+    assert len(result["cards"]) == 2
+    assert "максимум 8 ч на площадке при запросе 6 ч" in result["message"]
+    assert all("8 ч" not in card["explanation"].split(". Цена от ", 1)[0]
+               for card in result["cards"])
+    capacity = next(card for card in result["cards"] if card["id"] == "HK-90011")
+    assert "200 гостей" in capacity["explanation"].split(". Цена от ", 1)[0]
+    assert "200 гостей" in capacity["highlights"][0]
+    assert all("8 ч" not in item for card in result["cards"] for item in card["highlights"])
+
+
+@pytest.mark.parametrize("lead", ["Такой", "Этот", "Он", "Она", "Там", "Поэтому"])
+def test_contextless_description_sentence_is_not_quoted(catalog, lead):
+    profile = next(c for c in catalog if c.id == "HK-90011")
+    profile = replace(profile, busy=frozenset(), description=(
+        f"{lead} создаёт настроение на свадьбе. Более 5 лет организуем свадебные банкеты."
+    ))
+    req = MatchRequest("Алматы", date(2026, 10, 10), "свадьба", "Банкетный зал",
+                       5_000_000)
+    explanation = match(req, [profile])["cards"][0]["explanation"]
+    assert "Более 5 лет организуем свадебные банкеты" in explanation
+    assert f"«{lead}" not in explanation
+
+
+def test_run_on_host_bio_provides_specific_quote(catalog):
+    req = MatchRequest("Астана", date(2026, 11, 14), "свадьба", "Ведущий",
+                       1_200_000, duration=6)
+    result = match(req, catalog)
+    host = next(card for card in result["cards"] if card["id"] == "HK-26808")
+    assert "Сценарист команды КВН Высшей лиги" in host["explanation"]
+    assert "Сценарист команды КВН Высшей лиги" in host["highlights"][0]
+    assert "казахский, русский" in result["message"]
+
+
+@pytest.mark.parametrize(("profile_id", "category", "detail"), [
+    ("HK-36965", "Национальный ансамбль", "Прославляем казахскую песню"),
+    ("HK-57480", "Лайв-бэнд", "хитов 90-х и 2000-х"),
+])
+def test_music_profiles_lead_with_repertoire_not_generic_languages(
+        catalog, profile_id, category, detail):
+    profile = next(c for c in catalog if c.id == profile_id)
+    profile = replace(profile, busy=frozenset(), formats=frozenset({"корпоратив"}))
+    req = MatchRequest(profile.city, date(2026, 10, 10), "корпоратив", category, 5_000_000)
+    explanation = match(req, [profile])["cards"][0]["explanation"]
+    assert detail in explanation.split(". Цена от ", 1)[0]
+    assert not explanation.startswith("В профиле указаны языки")
+
+
+def test_numeric_rank_from_bio_beats_generic_role(catalog):
+    profile = next(c for c in catalog if c.id == "HK-76268")
+    profile = replace(profile, busy=frozenset(), formats=frozenset({"свадьба"}))
+    req = MatchRequest("Алматы", date(2026, 12, 26), "свадьба", "Фотограф", 800_000)
+    explanation = match(req, [profile])["cards"][0]["explanation"]
+    assert "топ 5 Алматы" in explanation.split(". Цена от ", 1)[0]
 
 
 def test_http_contract():
