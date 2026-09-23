@@ -195,6 +195,18 @@ def parse_request(text: str, known: dict) -> dict:
             notes.append(f"В тексте есть и {extra} — сервис подбирает по одному значению "
                          f"(взято «{hits[0][1]}»), остальное запросите отдельно.")
 
+    # «Казахская свадьба» не говорит ни о языке ведения, ни о формате «той» однозначно —
+    # не угадываем, а подсказываем обе возможности.
+    kz = re.search(r"казахск\w*\s+(?:свадьб|свадеб)\w*", text, FLAGS)
+    if kz:
+        tips = []
+        if params["language"] is None:
+            tips.append("если нужен подрядчик на казахском языке, выберите язык «казахский»")
+        if params["event_type"] == "свадьба":
+            tips.append("для традиционного тоя в каталоге есть отдельный формат «той»")
+        if tips:
+            notes.append(f"«{kz.group(0)}»: " + "; ".join(tips) + ".")
+
     labels = {"city": "город", "date": "дата", "event_type": "тип мероприятия",
               "category": "категория подрядчика", "budget": "бюджет"}
     missing = [f for f in REQUIRED if params[f] is None]

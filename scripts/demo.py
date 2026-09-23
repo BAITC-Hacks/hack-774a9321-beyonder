@@ -18,10 +18,13 @@ CASES = [
     ("december", "Тот же запрос на декабрь", {"date": "2026-12-12"}, "partial", ["HK-76268"]),
     ("invalid", "Дата вне календаря", {"date": "2027-01-01"}, "invalid_request", []),
 ]
+NL_TEXT = "Нужен ведущий на казахскую свадьбу 14 ноября в Алматы, бюджет до 800 тысяч, часов на 6"
+NL_EXPECTED = dict(city="Алматы", date="2026-11-14", event_type="свадьба",
+                   category="Ведущий", budget=800000, duration=6)
 
 
-def post(base_url: str, body: dict) -> dict:
-    req = Request(base_url.rstrip("/") + "/api/match",
+def post(base_url: str, body: dict, path: str = "/api/match") -> dict:
+    req = Request(base_url.rstrip("/") + path,
                   data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
                   headers={"Content-Type": "application/json"}, method="POST")
     with urlopen(req, timeout=45) as response:
@@ -43,12 +46,45 @@ def validate(data: dict, outcome: str, ids: list[str]) -> list[str]:
     return errors
 
 
+def check_nl(base_url: str, results: dict, failures: list) -> None:
+    """Свободный текст → /api/ask: все поля распознаны и сразу выполнен подбор."""
+    print(f"\n=== nl: Запрос свободным текстом ===\n{NL_TEXT}")
+    try:
+        data = post(base_url, {"text": NL_TEXT}, "/api/ask")
+    except HTTPError as exc:
+        if exc.code == 404:
+            print("SKIP: на сервере нет /api/ask")
+            return
+        print(f"HTTP {exc.code}: {exc.read().decode('utf-8', errors='replace')}")
+        failures.append("nl")
+        return
+    except (URLError, TimeoutError, OSError, ValueError) as exc:
+        print(f"API недоступен или ответ некорректен: {exc}")
+        failures.append("nl")
+        return
+    results["nl"] = {"request": {"text": NL_TEXT}, "response": data}
+    parsed, result = data.get("parsed") or {}, data.get("result") or {}
+    for item in parsed.get("found", []):
+        print(f"  понял: {item['field']} = {item['value']}  ← «{item['fragment']}»")
+    errors = [f"{k}: ожидалось {v}, получено {parsed.get('params', {}).get(k)}"
+              for k, v in NL_EXPECTED.items() if parsed.get("params", {}).get(k) != v]
+    if parsed.get("missing"):
+        errors.append(f"не распознаны: {', '.join(parsed['missing'])}")
+    if result.get("outcome") not in ("found", "partial"):
+        errors.append(f"ожидался подбор, получено {result.get('outcome')}")
+    print(f"outcome: {result.get('outcome')}\nmessage: {result.get('message')}")
+    for c in result.get("cards", []):
+        print(f"  {c['id']} · {c['name']} · от {c['price_from_kzt']} ₸")
+    failures.extend(f"nl: {error}" for error in errors)
+    print("FAIL: " + "; ".join(errors) if errors else "PASS")
+
+
 def main() -> int:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base-url", default="http://localhost:8000")
-    parser.add_argument("--case", choices=[x[0] for x in CASES], help="Запустить один сценарий")
+    parser.add_argument("--case", choices=[x[0] for x in CASES] + ["nl"], help="Запустить один сценарий")
     parser.add_argument("--save", type=Path, help="Сохранить фактические запросы и ответы в JSON")
     args = parser.parse_args()
     results, failures = {}, []
@@ -93,6 +129,8 @@ def main() -> int:
         print(f"\nОктябрь → декабрь: заняты {', '.join(disappeared) or 'никто'}")
         if not october or not october.issubset(busy):
             failures.append("Смена даты: ожидалось исключение всех трёх октябрьских кандидатов по занятости")
+    if not args.case or args.case == "nl":
+        check_nl(args.base_url, results, failures)
     if args.save:
         args.save.parent.mkdir(parents=True, exist_ok=True)
         args.save.write_text(json.dumps(results, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
