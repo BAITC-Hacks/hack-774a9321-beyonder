@@ -470,7 +470,7 @@ function scoreHTML(c) {
     .filter(key => numeric(parts[key]));
   if (!keys.length) return '';
   const semanticAlias = numeric(parts.semantic) && numeric(parts.relevance) && parts.semantic === parts.relevance;
-  const knownWeights = keys.every(key => ['budget','relevance','hours','language','data_quality'].includes(key) || (key === 'semantic' && semanticAlias)) &&
+  const knownWeights = keys.every(key => Object.hasOwn(SCORE_PARTS,key)) &&
     ['budget','relevance','hours','language','data_quality'].every(key => numeric(parts[key]));
   const total = numeric(c.score) ? `<p class="score-total">Итог: ${(c.score*100).toLocaleString('ru-RU',{maximumFractionDigits:1})} из 100</p>` : '';
   return `<details class="score-details"><summary>Как посчитан рейтинг</summary>${total}<div class="score-list">${keys.map(key => {
@@ -478,7 +478,7 @@ function scoreHTML(c) {
     const label = SCORE_PARTS[key]?.[0] || `Дополнительный фактор (${key})`;
     const weight = knownWeights ? SCORE_PARTS[key]?.[1] : null;
     return `<div class="score-row"><div class="score-row-head"><span>${esc(label)}${weight ? ` · вес ${weight}` : ''}</span><span>${value} из 100</span></div><div class="score-track" aria-hidden="true"><span style="width:${value}%"></span></div></div>`;
-  }).join('')}</div><p class="score-note">Оценки факторов показаны до учёта весов и округлены; итог рассчитан по точным значениям с указанными весами и не является вероятностью.${semanticAlias ? ' «Смысл описания» раскрывает оценку «Описание и формат» и отдельно не прибавляется.' : ''} При равенстве — по id.</p></details>`;
+  }).join('')}</div><p class="score-note">Оценки факторов показаны до учёта весов и округлены; итог рассчитан по точным значениям с указанными весами и не является вероятностью.${semanticAlias ? ' «Смысл описания» раскрывает оценку «Описание и формат» и отдельно не прибавляется.' : numeric(parts.semantic) ? ' Для этого профиля нет предрассчитанной оценки: «Описание и формат» оценивается по маркерам; «Смысл описания» отдельно не прибавляется.' : ''} При равенстве — по id.</p></details>`;
 }
 function cardHTML(c, index, cards, request, changed, otherDate) {
   const source = c.explanation_source === 'llm' ? 'AI-объяснение' : c.explanation_source === 'template' ? 'Объяснение по данным' : '';
