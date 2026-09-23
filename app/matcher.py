@@ -122,16 +122,16 @@ def _check(c: Contractor, req: MatchRequest) -> list[tuple[str, str]]:
 def _score(cand: Candidate, req: MatchRequest) -> None:
     c = cand.c
     budget = max(0.0, 1.0 - c.price / req.budget)  # «цена от» — запас по бюджету ценен
-    if semantic.INDEX is None:
+    ranked = semantic.ranked_sentences(semantic.INDEX, c.id, c.description, req.event_type)
+    if not ranked:
         cand.snippet, cand.marker_hits = _best_snippet(c.description, req.event_type)
         specialist = 0.3 if len(c.formats) <= 2 else 0.0
         relevance = min(1.0, cand.marker_hits / 3) * 0.7 + specialist
         semantic_score = 0.0
     else:
-        ranked = semantic.ranked_sentences(semantic.INDEX, c.id, c.description, req.event_type)
-        cand.snippet = ranked[0][0] if ranked else None
+        cand.snippet = ranked[0][0]
         cand.marker_hits = 0
-        semantic_score = ranked[0][1] if ranked else 0.0
+        semantic_score = ranked[0][1]
         relevance = semantic_score
     if req.duration and c.max_hours is not None:
         hours = min(1.0, (c.max_hours - req.duration) / 4)
@@ -193,6 +193,7 @@ def _description_quote(cand: Candidate, req: MatchRequest, shown: list[Candidate
     venue = req.category in VENUE_CATEGORIES
     semantic_scores = dict(semantic.ranked_sentences(
         semantic.INDEX, cand.c.id, cand.c.description, req.event_type))
+    has_semantic = bool(semantic_scores)
     options = []
     for position, sentence in enumerate(_sentences(cand.c.description)):
         if CONTEXT_DEPENDENT_LEAD.match(sentence):
@@ -205,11 +206,18 @@ def _description_quote(cand: Candidate, req: MatchRequest, shown: list[Candidate
             r"созда[её]м|организуем|предлагаем|прославляем)\b", sentence, re.I))
         letters = [ch for ch in sentence if ch.isalpha()]
         all_caps = bool(letters and sum(ch.isupper() for ch in letters) / len(letters) > 0.6)
-        fragments = ([sentence] if len(sentence) <= 100 else
-                     [part.strip() for part in re.split(
-                         r"[,;:]|(?=\b(?:Финалист|Резидент|Ведущий|Организатор|"
-                         r"Участник|Сценарист)\b)", sentence,
-                     )])
+        fragments = []
+        # Описания бывают одним длинным маркированным абзацем: каждая «•»
+        # отделяет самостоятельный пункт, который нельзя цитировать обрывком.
+        for bullet in sentence.split("•"):
+            bullet = bullet.strip()
+            if len(bullet) <= 100:
+                fragments.append(bullet)
+            else:
+                fragments.extend(part.strip() for part in re.split(
+                    r"[,;:]|(?=\b(?:Финалист|Резидент|Ведущий|Организатор|"
+                    r"Участник|Сценарист)\b)", bullet,
+                ))
         for fragment in fragments:
             fragment = fragment.strip()
             if CONTEXT_DEPENDENT_LEAD.match(fragment):
@@ -226,9 +234,10 @@ def _description_quote(cand: Candidate, req: MatchRequest, shown: list[Candidate
                 fragment = re.sub(r"(?:\s+(?:и|с|со|на|для|по|в|от|из))+$", "", fragment)
             fragment = fragment.rstrip(",;:.!?… ")
             if (len(fragment) < 16 or "«" in fragment or "»" in fragment
+                    or re.search(r"\b[А-ЯЁ]{4,}\b", fragment)
                     or explain_llm.has_generic_phrase(fragment)):
                 continue
-            event_hits = _marker_hits(fragment, req.event_type) if semantic.INDEX is None else 0
+            event_hits = _marker_hits(fragment, req.event_type) if not has_semantic else 0
             capacity = bool(re.search(
                 r"\b\d+\s*(?:гост(?:ей|я|ь)?|человек|мест)\b|"
                 r"\b(?:вместимост[ьи]|зал\s+на)\b.{0,30}\b\d+", fragment, re.I,
@@ -272,7 +281,7 @@ def _description_quote(cand: Candidate, req: MatchRequest, shown: list[Candidate
             quote_score -= 0.08 if first_person else 0.0
             quote_score -= 0.07 if all_caps else 0.0
             ranking = ((unique, round(quote_score, 6), *original_rank)
-                       if semantic.INDEX is not None else (unique, *original_rank))
+                       if has_semantic else (unique, *original_rank))
             options.append((ranking, fragment))
     return max(options, default=((), None))[1]
 
