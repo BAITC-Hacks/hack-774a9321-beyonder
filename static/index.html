@@ -250,7 +250,7 @@ function parsedHTML(data) {
   const found = list(data.found), notes = list(data.notes), missing = list(data.missing);
   return `<strong>Поняли из описания</strong>${found.length ? `<ul>${found.map(x =>
     `<li>${esc(FIELD_LABELS[x.field] || x.field)} — <strong>${esc(x.field === 'date' ? dateLabel(x.value) : x.field === 'budget' ? money(x.value) : x.value)}</strong>${x.fragment ? ` <span class="meta">(из текста: «${esc(x.fragment)}»)</span>` : ''}</li>`).join('')}</ul>` : '<p class="meta">Пока ничего не распознано.</p>'}
-    ${missing.length ? `<p class="missing-summary">Уточните в подсвеченных полях: ${missing.map(x => esc(FIELD_LABELS[x] || x)).join(', ')}.</p>` : '<p class="meta">Обязательные условия найдены.</p>'}
+    ${missing.length ? `<p class="missing-summary">Уточните в подсвеченных полях: ${missing.map(x => esc(FIELD_LABELS[x] || x)).join(', ')}.</p>` : '<p class="meta">Обязательные условия найдены. Проверьте поля и нажмите «Подобрать подрядчиков».</p>'}
     ${notes.length ? `<ul class="note-list">${notes.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}`;
 }
 function cancelParse(message) {
@@ -275,9 +275,7 @@ async function parseText() {
     parsedSummaryCurrent = true;
     nlResult.innerHTML = parsedHTML(data);
     if (!data.missing.length) {
-      const request = readRequest();
-      if (request) run(request);
-      else note('Проверьте подсвеченные ограничения формы, в том числе диапазон дат.',true);
+      note('Проверьте распознанные условия и заметки, затем нажмите «Подобрать подрядчиков».');
     } else { note('Заполните недостающие поля и запустите подбор.'); field(data.missing[0])?.focus(); }
   } catch (error) {
     if (current !== parsedGeneration) return;
