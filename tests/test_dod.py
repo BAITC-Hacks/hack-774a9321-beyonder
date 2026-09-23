@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 
 from app.data import CALENDAR_END, CALENDAR_START, load_catalog
 from app.main import app
-from app.matcher import MatchRequest, match
+from app.matcher import MatchRequest, fmt_kzt, match
 
 
 @pytest.fixture(autouse=True)
@@ -83,6 +83,17 @@ def test_rare_category_explains_partial_result(req, catalog):
     assert response["outcome"] == "partial"
     assert "меньше трёх" in response["message"] or "только" in response["message"]
     assert "Флорист" in response["message"]
+
+
+def test_budget_hint_refers_to_profile_without_guessing_gender(req, catalog):
+    shown_id = match(req, catalog)["cards"][0]["id"]
+    contractor = next(c for c in catalog if c.id == shown_id)
+    contractor = replace(contractor, name="Софи Хаттер", price=req.budget + 1)
+    response = match(req, [contractor])
+    assert response["hints"] == [
+        f"При бюджете от {fmt_kzt(contractor.price)} подошёл бы профиль «Софи Хаттер»: "
+        "свободен и берёт этот формат.",
+    ]
 
 
 @pytest.mark.parametrize("day", [date(2026, 9, 22), date(2027, 1, 1)])

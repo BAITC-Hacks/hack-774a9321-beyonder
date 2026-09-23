@@ -282,7 +282,7 @@ def _hints(failed: list[Candidate], req: MatchRequest) -> list[str]:
     only_budget = [f for f in failed if [code for code, _ in f.fails] == ["budget"]]
     if only_budget:
         cheapest = min(only_budget, key=lambda x: (x.c.price, x.c.id))
-        hints.append(f"При бюджете от {fmt_kzt(cheapest.c.price)} подошёл бы {cheapest.c.name} — он свободен и берёт этот формат.")
+        hints.append(f"При бюджете от {fmt_kzt(cheapest.c.price)} подошёл бы профиль «{cheapest.c.name}»: свободен и берёт этот формат.")
     return hints
 
 

@@ -13,7 +13,7 @@ import tempfile
 import threading
 import time
 
-PROMPT_VERSION = "comparative-1"
+PROMPT_VERSION = "comparative-2"
 TIMEOUT_SECONDS = 6.0  # общий бюджет обеих попыток, а не шесть секунд на каждую
 CACHE_FILE = Path(__file__).resolve().parent.parent / ".cache" / "explanations.json"
 _LOCK = threading.Lock()
@@ -29,7 +29,8 @@ _STOP = re.compile(
 SYSTEM_PROMPT = """Ты редактируешь объяснения подбора event-подрядчиков на русском.
 Верни строго JSON {"explanations": ["..."]}: по одной строке на карточку в исходном
 порядке. Каждая строка — 1–2 предложения, без списков, имён, общих похвал и новых
-фактов. В каждой строке должно быть число из фактов либо точная цитата description_quote.
+фактов. Пиши о профиле, не угадывай род по имени; не используй «он/она» вне дословных
+цитат из описания. В каждой строке должно быть число из фактов либо точная цитата description_quote.
 Если comparisons не пуст, дословно включи хотя бы один его пункт. Сравнивай только
 внутри этой подборки; не вычисляй числа самостоятельно. Объяснения должны отличаться
 содержанием даже без имён. У цены обязательно «от», price_imputed означает оценочную
@@ -85,6 +86,8 @@ def _validate(raw: str, payload: dict, cards: list[dict]) -> tuple[list[str] | N
             errors.append(prefix + "нужно 1–2 предложения, не более 1000 символов")
         if has_generic_phrase(text):
             errors.append(prefix + "убери общие фразы из стоп-листа")
+        if re.search(r"\b(?:он|она)\b", _QUOTES.sub("", text), re.IGNORECASE):
+            errors.append(prefix + "пиши о профиле без он/она вне дословных цитат; не угадывай род")
         quotes = [next(v for v in found if v) for found in _QUOTES.findall(text)]
         description = _normal(facts.get("description_quote") or "")
         grounded_quote = any(len(q) >= 8 and _normal(q) in description for q in quotes)

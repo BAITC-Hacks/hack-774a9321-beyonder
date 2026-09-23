@@ -172,11 +172,24 @@ def test_validator_rejects_duplicates_and_extra_fields(bundle):
     assert llm._validate(json.dumps({"explanations": bundle.texts, "extra": 1}), bundle.payload, bundle.cards)[1]
 
 
-def test_validator_accepts_description_quote_without_digits():
+@pytest.mark.parametrize("pronoun", ["он", "Она"])
+def test_validator_rejects_gendered_pronouns_outside_quotes(bundle, pronoun):
+    texts = [bundle.texts[0] + f" {pronoun} берёт этот формат.", *bundle.texts[1:]]
+    value, errors = llm._validate(json.dumps({"explanations": texts}), bundle.payload, bundle.cards)
+    assert value is None
+    assert any("не угадывай род" in error for error in errors)
+
+
+@pytest.mark.parametrize("quote", [
+    "Ведёт свадьбы на казахском языке",
+    "Она ведёт свадьбы на казахском языке",
+    "Он ведёт свадьбы на казахском языке",
+])
+def test_validator_accepts_description_quote_without_digits(quote):
     cards = [{"id": "one", "name": "Имя"}]
     payload = {"request": {}, "context": {}, "cards": [{"price_from_kzt": 100,
-               "comparisons": [], "description_quote": "Ведёт свадьбы на казахском языке"}]}
-    raw = json.dumps({"explanations": ["В описании: «Ведёт свадьбы на казахском языке»."]})
+               "comparisons": [], "description_quote": quote}]}
+    raw = json.dumps({"explanations": [f"В описании: «{quote}»."]})
     assert llm._validate(raw, payload, cards)[1] == []
 
 
