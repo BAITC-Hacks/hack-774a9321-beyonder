@@ -8,6 +8,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
+from .alternatives import alternatives
 from .data import CALENDAR_END, CALENDAR_START, load_catalog
 from .matcher import MatchRequest, match
 from .nl_parse import parse_request
@@ -42,16 +43,25 @@ def meta() -> dict:
     }
 
 
-@app.post("/api/match")
-def api_match(body: MatchIn) -> dict:
+def _to_request(body: MatchIn) -> MatchRequest:
     known = meta()
     if body.event_type not in known["event_types"]:
         raise HTTPException(422, f"Неизвестный тип мероприятия: {body.event_type}")
     if body.language and body.language not in known["languages"]:
         raise HTTPException(422, f"Неизвестный язык: {body.language}")
-    req = MatchRequest(city=body.city, date=body.date, event_type=body.event_type, category=body.category,
-                       budget=body.budget, duration=body.duration, language=body.language or None)
-    return match(req, CATALOG)
+    return MatchRequest(city=body.city, date=body.date, event_type=body.event_type, category=body.category,
+                        budget=body.budget, duration=body.duration, language=body.language or None)
+
+
+@app.post("/api/match")
+def api_match(body: MatchIn) -> dict:
+    return match(_to_request(body), CATALOG)
+
+
+@app.post("/api/alternatives")
+def api_alternatives(body: MatchIn) -> dict:
+    """«План Б»: ближайшие даты (±14 дней), на которые подходит больше подрядчиков."""
+    return alternatives(_to_request(body), CATALOG)
 
 
 class TextIn(BaseModel):
