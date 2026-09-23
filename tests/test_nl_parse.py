@@ -50,6 +50,28 @@ def test_kazakh_wedding_suggests_language_and_toi_without_guessing():
     assert "«казахский»" in note and "«той»" in note
 
 
+def test_negated_language_is_not_selected_and_is_explained():
+    r = parse("Ведущий не на английском, свадьба 14 ноября Алматы 800 тысяч")
+    assert r["params"]["language"] is None
+    assert any("не на английском" in n for n in r["notes"])
+
+
+def test_negated_event_type_takes_the_other_one():
+    assert parse("не свадьба, а юбилей, ведущий")["params"]["event_type"] == "юбилей"
+
+
+def test_negative_budget_is_rejected_with_note():
+    r = parse("Ведущий на свадьбу 14 ноября Алматы бюджет -800 тысяч")
+    assert r["params"]["budget"] is None and "budget" in r["missing"]
+    assert any("отрицательн" in n for n in r["notes"])
+
+
+def test_budget_range_takes_upper_bound():
+    r = parse("Ведущий на свадьбу 14 ноября Алматы бюджет 600-800 тысяч")
+    assert r["params"]["budget"] == 800_000
+    assert any("диапазон" in n for n in r["notes"])
+
+
 def test_date_outside_calendar_is_flagged():
     r = parse("лайв-бэнд на свадьбу 5 января в Алматы 2 млн")
     assert any("вне календаря" in n for n in r["notes"])

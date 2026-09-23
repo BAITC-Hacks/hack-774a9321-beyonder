@@ -78,19 +78,40 @@ def _blank(text: str, span: tuple[int, int]) -> str:
     return text[:a] + " " * (b - a) + text[b:]
 
 
-def _first_by_position(text: str, table: dict[str, list[str]]) -> list[tuple[int, str, str]]:
+NEGATION = re.compile(r"(?:^|(?<=\W))(не|без|кроме)\s+$", FLAGS)
+
+
+def _negation(text: str, start: int) -> str | None:
+    """«не на английском», «без фотографа», «кроме свадеб» — значение исключено, а не выбрано.
+
+    Возвращает слово-отрицание перед позицией start или None.
+    """
+    m = NEGATION.search(text[max(0, start - 12):start])
+    return m.group(1) if m else None
+
+
+def _first_by_position(text: str, table: dict[str, list[str]],
+                       negated: list[str] | None = None) -> list[tuple[int, str, str]]:
     """Совпадения словаря (позиция, значение, фрагмент): раньше в тексте — первым.
 
     Если два значения найдены на одном и том же месте («ведущий церемонии» и «ведущий»),
-    остаётся более конкретное — то, что выше в словаре.
+    остаётся более конкретное — то, что выше в словаре. Совпадения после «не/без/кроме»
+    пропускаются и складываются в negated — фильтра «кроме» в сервисе нет.
     """
     hits = []
     for rank, (value, patterns) in enumerate(table.items()):
         best = None
         for p in patterns:
-            m = re.search(p, text, FLAGS)
-            if m and (best is None or m.start() < best.start()):
-                best = m
+            for m in re.finditer(p, text, FLAGS):
+                neg = _negation(text, m.start())
+                if neg:
+                    if negated is not None:
+                        word_end = m.end() + re.match(r"\w*", text[m.end():]).end()
+                        negated.append(f"{neg} {text[m.start():word_end]}")
+                    continue
+                if best is None or m.start() < best.start():
+                    best = m
+                break
         if best:
             hits.append((best.start(), rank, best.end(), value, best.group(0)))
     hits.sort()
@@ -133,18 +154,31 @@ def _parse_date(text: str) -> tuple[date | None, str | None, tuple[int, int] | N
     return dt, m.group(0), m.span(), note
 
 
-def _parse_budget(text: str) -> tuple[int | None, str | None, tuple[int, int] | None]:
+def _parse_budget(text: str) -> tuple[int | None, str | None, str | None]:
+    """Бюджет, его фрагмент и замечание.
+
+    «-800 тысяч» — отрицательная сумма: не принимается. «600-800 тысяч» — диапазон:
+    берётся верхняя граница, потому что фильтр сравнивает «цену от» с максимумом бюджета.
+    """
     found = []
     for pattern, mult in MONEY_UNIT:
         for m in re.finditer(pattern, text, FLAGS):
-            found.append((m.start(), round(_to_float(m[1]) * mult), m.group(0), m.span()))
+            found.append((m.start(), round(_to_float(m[1]) * mult), m.group(0)))
     if not found:
         for m in re.finditer(MONEY_PLAIN, text):
-            found.append((m.start(), int(re.sub(r"\D", "", m[1])), m.group(0), m.span()))
+            found.append((m.start(), int(re.sub(r"\D", "", m[1])), m.group(0)))
     if not found:
         return None, None, None
-    _, value, frag, span = min(found)
-    return value, frag, span
+    start, value, frag = min(found)
+    before = text[:start]
+    if re.search(r"\d\s*[-−–]\s*$", before):
+        low = re.search(r"(\d+(?:[.,]\d+)?)\s*[-−–]\s*$", before)
+        return value, f"{low.group(0)}{frag}", "Указан диапазон бюджета — взята верхняя граница."
+    if re.search(r"[-−–]\s*$", before):
+        return None, None, f"Бюджет «-{frag}» отрицательный — укажите сумму в тенге."
+    if value <= 0:
+        return None, None, "Бюджет должен быть больше нуля."
+    return value, frag, None
 
 
 def _parse_duration(text: str) -> tuple[int | None, str | None]:
@@ -178,15 +212,21 @@ def parse_request(text: str, known: dict) -> dict:
         put("duration", duration, frag)
         rest = rest.replace(frag, " " * len(frag), 1)
 
-    budget, frag, span = _parse_budget(rest)
+    budget, frag, note = _parse_budget(rest)
     if budget:
         put("budget", budget, frag)
+    if note:
+        notes.append(note)
 
     for field, table, allowed in (("city", CITIES, known["cities"]),
                                   ("event_type", EVENT_TYPES, known["event_types"]),
                                   ("category", CATEGORIES, known["categories"]),
                                   ("language", LANGUAGES, known["languages"])):
-        hits = [h for h in _first_by_position(text, table) if h[1] in allowed]
+        negated: list[str] = []
+        hits = [h for h in _first_by_position(text, table, negated) if h[1] in allowed]
+        if negated:
+            notes.append(f"«{negated[0]}» — исключить значение нельзя, сервис подбирает только "
+                         f"по выбранному; это условие не учтено.")
         if not hits:
             continue
         put(field, hits[0][1], hits[0][2])
