@@ -115,7 +115,7 @@
   <section class="panel" aria-label="Условия подбора">
     <div class="nl">
       <h2>Опишите мероприятие своими словами</h2>
-      <p class="meta">Мы заполним форму тем, что удалось понять. Вы увидите исходные фразы и сможете исправить любое поле.</p>
+      <p class="meta">Мы заполним форму тем, что удалось понять. Вы увидите фрагменты текста и сможете исправить любое поле.</p>
       <label for="nl-text">Что вам нужно?
         <textarea id="nl-text" maxlength="1000" placeholder="Нужен фотограф на свадьбу в Алматы 14 ноября, бюджет 800 тысяч тенге"></textarea>
       </label>
@@ -172,10 +172,10 @@ const list = value => Array.isArray(value) ? value : [];
 const money = value => Number.isFinite(Number(value)) ? Number(value).toLocaleString('ru-RU') + ' ₸' : 'не указана';
 const dateLabel = value => /^\d{4}-\d{2}-\d{2}$/.test(value || '') ? value.split('-').reverse().join('.') : String(value || '');
 const synthetic = c => c.synthetic ? '<span class="badge synthetic">синтетический профиль</span>' : '';
-let ready = false, pending = false, parsing = false, lastRequest = null, generation = 0, active = null;
+let ready = false, pending = false, parsing = false, parsedSummaryCurrent = false, lastRequest = null, generation = 0, active = null;
 let parsedGeneration = 0, parseActive = null, renderedRequests = [];
 
-function buttons() { submit.disabled = !ready || pending; compare.disabled = !ready || pending || !lastRequest; parseButton.disabled = !ready || parsing; }
+function buttons() { submit.disabled = !ready || pending || parsing; compare.disabled = !ready || pending || parsing || !lastRequest; parseButton.disabled = !ready || parsing; }
 function note(text, error = false) { status.className = text ? 'notice' + (error ? ' error' : '') : ''; status.textContent = text; }
 function apiError(data) {
   if (Array.isArray(data.detail)) return data.detail.map(x => `${list(x.loc).slice(1).join('.')}: ${x.msg || 'некорректное значение'}`).join('; ');
@@ -250,8 +250,13 @@ function parsedHTML(data) {
   const found = list(data.found), notes = list(data.notes), missing = list(data.missing);
   return `<strong>Поняли из описания</strong>${found.length ? `<ul>${found.map(x =>
     `<li>${esc(FIELD_LABELS[x.field] || x.field)} — <strong>${esc(x.field === 'date' ? dateLabel(x.value) : x.field === 'budget' ? money(x.value) : x.value)}</strong>${x.fragment ? ` <span class="meta">(из текста: «${esc(x.fragment)}»)</span>` : ''}</li>`).join('')}</ul>` : '<p class="meta">Пока ничего не распознано.</p>'}
-    ${missing.length ? `<p class="missing-summary">Уточните в подсвеченных полях: ${missing.map(x => esc(FIELD_LABELS[x] || x)).join(', ')}.</p>` : '<p class="meta">Обязательные условия найдены — запускаем подбор.</p>'}
+    ${missing.length ? `<p class="missing-summary">Уточните в подсвеченных полях: ${missing.map(x => esc(FIELD_LABELS[x] || x)).join(', ')}.</p>` : '<p class="meta">Обязательные условия найдены.</p>'}
     ${notes.length ? `<ul class="note-list">${notes.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}`;
+}
+function cancelParse(message) {
+  if (!parsing) return;
+  parsedGeneration++; parseActive?.abort(); parseActive = null; parsing = false;
+  nlResult.textContent = message; buttons();
 }
 async function parseText() {
   const value = nlText.value.trim();
@@ -267,6 +272,7 @@ async function parseText() {
     if (current !== parsedGeneration) return;
     if (!data || !data.params || typeof data.params !== 'object' || !Array.isArray(data.missing) || !Array.isArray(data.found)) throw new Error('Сервер вернул неполный разбор запроса.');
     applyParams(data.params,data.missing);
+    parsedSummaryCurrent = true;
     nlResult.innerHTML = parsedHTML(data);
     if (!data.missing.length) {
       const request = readRequest();
@@ -275,6 +281,7 @@ async function parseText() {
     } else { note('Заполните недостающие поля и запустите подбор.'); field(data.missing[0])?.focus(); }
   } catch (error) {
     if (current !== parsedGeneration) return;
+    parsedSummaryCurrent = false;
     nlResult.textContent = error.name === 'AbortError' ? 'Сервер не ответил на разбор за 15 секунд. Попробуйте ещё раз.' : error.message;
     note(nlResult.textContent,true);
   } finally {
@@ -363,17 +370,19 @@ async function run(request, secondDate = null) {
   }
 }
 f.addEventListener('input', event => {
-  if (parsing) { parsedGeneration++; parseActive?.abort(); parseActive = null; parsing = false; nlResult.textContent = 'Форма изменена вручную. Чтобы использовать описание, нажмите «Разобрать» ещё раз.'; buttons(); }
+  cancelParse('Форма изменена вручную. Чтобы использовать описание, нажмите «Разобрать» ещё раз.');
+  if (parsedSummaryCurrent) { parsedSummaryCurrent = false; nlResult.textContent = 'Вы изменили форму после разбора. Проверьте условия и нажмите «Подобрать подрядчиков».'; }
   field('budget').setCustomValidity(''); field('duration').setCustomValidity('');
   if (event.target.value) { event.target.classList.remove('missing-field'); event.target.removeAttribute('aria-invalid'); }
   invalidateResults();
 });
-f.addEventListener('submit', event => { event.preventDefault(); const request = readRequest(); if (request) run(request); });
+f.addEventListener('submit', event => { event.preventDefault(); cancelParse('Ручной подбор запущен. Для нового разбора нажмите «Разобрать».'); const request = readRequest(); if (request) run(request); });
 parseButton.addEventListener('click',parseText);
 nlText.addEventListener('keydown',event => { if (event.key === 'Enter' && event.ctrlKey) { event.preventDefault(); parseText(); } });
 nlText.addEventListener('input',() => {
-  if (!parsing) return;
-  parsedGeneration++; parseActive?.abort(); parseActive = null; parsing = false; nlResult.textContent = 'Описание изменилось. Нажмите «Разобрать» ещё раз.'; buttons();
+  cancelParse('Описание изменилось. Нажмите «Разобрать» ещё раз.');
+  if (parsedSummaryCurrent) { parsedSummaryCurrent = false; invalidateResults('Описание изменилось. Разберите новый запрос, чтобы обновить подбор.'); }
+  if (nlResult.textContent) nlResult.textContent = 'Описание изменилось. Нажмите «Разобрать» ещё раз.';
 });
 out.addEventListener('click',event => {
   const action = event.target.closest('.hint-action');
