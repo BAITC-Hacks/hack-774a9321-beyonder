@@ -147,7 +147,7 @@ def main() -> int:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--base-url", default="http://localhost:8000")
+    parser.add_argument("--base-url", default="http://127.0.0.1:8000")
     parser.add_argument("--case", choices=[x[0] for x in CASES] + ["nl", "plan-b"], help="Запустить один сценарий")
     parser.add_argument("--save", type=Path, help="Сохранить фактические запросы и ответы в JSON")
     args = parser.parse_args()
