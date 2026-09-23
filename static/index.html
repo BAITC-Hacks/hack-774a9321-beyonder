@@ -74,6 +74,18 @@
   .outcome.no_category_in_city { background:#eff1fc; border-left-color:#566eae; }
   .outcome.none_match { background:#fff0e8; border-left-color:#b85126; }
   .outcome.invalid_request { background:#fcecec; border-left-color:#a93535; }
+  .plan-b { position:relative; margin:14px 0 20px; padding:17px 18px 17px 21px; border:1px solid #c8d8ca; border-radius:12px; background:#f8fbf6; }
+  .plan-b::before { content:''; position:absolute; top:16px; bottom:16px; left:0; width:4px; border-radius:0 4px 4px 0; background:var(--green); }
+  .plan-b .eyebrow { color:var(--green); font-size:10px; }
+  .plan-b h3 { margin:4px 0 3px; }
+  .plan-b-intro, .plan-b-status { color:var(--muted); font-size:13px; margin:0; }
+  .plan-b-options { display:flex; flex-wrap:wrap; gap:9px; margin-top:13px; }
+  .plan-b-option { display:flex; flex-direction:column; align-items:flex-start; min-height:62px; padding:8px 13px; border:1px solid #b9cfbf; border-radius:9px; background:#fff; color:var(--ink); text-align:left; }
+  .plan-b-option:hover:not(:disabled) { background:#e9f2e8; border-color:var(--green); }
+  .plan-b-date { font-size:14px; font-weight:750; }
+  .plan-b-count { color:var(--muted); font-size:12px; font-weight:600; }
+  .plan-b-more { color:var(--muted); font-size:11px; }
+  .plan-b-retry { min-height:36px; margin-top:12px; padding:6px 12px; font-size:12px; }
   .hint { margin-top:9px; font-size:13px; }
   .hint-action { display:block; width:100%; min-height:0; padding:8px 10px; text-align:left; font-size:13px; font-weight:500; color:var(--ink); background:#fff; border:1px solid #bdd4c3; }
   .hint-action:hover:not(:disabled) { background:#e4f2e8; }
@@ -126,7 +138,7 @@
   [hidden] { display:none !important; }
   @media(max-width:1000px) { .cards { grid-template-columns:1fr; } }
   @media(max-width:850px) { form { grid-template-columns:repeat(2,minmax(0,1fr)); } .results.comparing { grid-template-columns:1fr; } }
-  @media(max-width:500px) { main { padding:18px 16px 36px; } .panel { padding:16px; } form { grid-template-columns:1fr; } header .eyebrow { font-size:9px; } .compare-bar label, .compare-bar button, .nl-row button { width:100%; } .hero { padding-top:26px; } }
+  @media(max-width:500px) { main { padding:18px 16px 36px; } .panel { padding:16px; } form { grid-template-columns:1fr; } header .eyebrow { font-size:9px; } .compare-bar label, .compare-bar button, .nl-row button { width:100%; } .plan-b-options { flex-direction:column; } .plan-b-option { width:100%; } .hero { padding-top:26px; } }
 </style>
 </head>
 <body>
@@ -218,6 +230,9 @@ const responseTime = ms => `${(ms/1000).toLocaleString('ru-RU',{minimumFractionD
 const synthetic = c => c.synthetic ? '<span class="badge synthetic">синтетический профиль</span>' : '';
 let ready = false, pending = false, parsing = false, parsedSummaryCurrent = false, lastRequest = null, generation = 0, active = null;
 let parsedGeneration = 0, parseActive = null, renderedRequests = [];
+const planBControllers = new Set();
+
+function cancelPlanB() { for (const controller of planBControllers) controller.abort(); planBControllers.clear(); }
 
 function buttons() {
   submit.disabled = !ready || pending || parsing;
@@ -278,7 +293,7 @@ function clearMissing() {
 }
 function invalidateResults(message = 'Условия изменились. Нажмите «Подобрать подрядчиков», чтобы обновить результат.') {
   if (!lastRequest && !pending) return;
-  generation++; active?.abort(); active = null; pending = false; lastRequest = null; renderedRequests = [];
+  generation++; active?.abort(); cancelPlanB(); active = null; pending = false; lastRequest = null; renderedRequests = [];
   out.className = 'results'; out.innerHTML = ''; out.setAttribute('aria-busy','false');
   note(message); buttons();
 }
@@ -352,6 +367,39 @@ function funnelHTML(data) {
   if (!stages.length) return '';
   return '<div class="funnel"><strong class="meta">Как сузился выбор</strong><ol>' + stages.map(s =>
     `<li><b>${esc(s.count)}</b> ${esc(STEP_LABELS[s.step] || s.step)}</li>`).join('') + '</ol></div>';
+}
+function planBLoadingHTML() {
+  return '<p class="plan-b-status" role="status" aria-live="polite" aria-atomic="true">Проверяем соседние даты…</p>';
+}
+function planBContentHTML(data) {
+  if (!Array.isArray(data.options) || typeof data.message !== 'string') throw new Error('Ответ сервера не содержит альтернативных дат.');
+  const options = data.options.filter(option => option && /^\d{4}-\d{2}-\d{2}$/.test(option.date || '') &&
+    numeric(option.passed) && option.passed > 0 && typeof option.label === 'string' && typeof option.weekday === 'string');
+  if (!options.length) return `<p class="plan-b-status" role="status" aria-live="polite" aria-atomic="true">${esc(data.message || 'В соседние даты подходящих вариантов не нашлось.')}</p>`;
+  return `<p class="plan-b-intro" role="status" aria-live="polite" aria-atomic="true">В эти даты подходит больше подрядчиков при тех же условиях.</p>
+    <div class="plan-b-options">${options.map(option => {
+      const shown = Math.min(Math.floor(option.passed),3);
+      const variant = shown === 1 ? 'вариант' : shown < 5 ? 'варианта' : 'вариантов';
+      const label = `${option.label} (${option.weekday}) — ${shown} ${variant}`;
+      return `<button type="button" class="plan-b-option" data-plan-b-date="${esc(option.date)}" aria-label="${esc(label)}"><span class="plan-b-date">${esc(option.label)} (${esc(option.weekday)})</span><span class="plan-b-count">— ${shown} ${variant}</span>${option.passed > 3 ? `<span class="plan-b-more">Из ${esc(option.passed)} подходящих покажем 3 лучших</span>` : ''}</button>`;
+    }).join('')}</div>`;
+}
+async function loadPlanB(request, side, current) {
+  const container = out.querySelector(`.result[data-side="${side}"] [data-plan-b-body]`);
+  if (!container) return;
+  container.innerHTML = planBLoadingHTML();
+  const controller = new AbortController(); planBControllers.add(controller);
+  const timeout = setTimeout(() => controller.abort(),15000);
+  try {
+    const data = await fetchJSON('/api/alternatives',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(request),signal:controller.signal});
+    if (current !== generation || !out.contains(container)) return;
+    container.innerHTML = planBContentHTML(data);
+  } catch (error) {
+    if (current !== generation || !out.contains(container)) return;
+    container.innerHTML = `<p class="plan-b-status" role="status" aria-live="polite" aria-atomic="true">${esc(error.name === 'AbortError' ? 'Поиск других дат занял слишком много времени.' : 'Не удалось проверить другие даты.')} Основная подборка доступна.</p><button type="button" class="secondary plan-b-retry" data-plan-b-retry>Повторить поиск дат</button>`;
+  } finally {
+    clearTimeout(timeout); planBControllers.delete(controller);
+  }
 }
 function hintAction(hint, request) {
   const day = /ближайший свободный день\s*[—–-]\s*(\d{1,2})\s+([а-яё]+)/i.exec(hint);
@@ -435,11 +483,13 @@ function resultHTML(data, request, other, otherRequest, side, elapsedMs) {
   const arrivedBusy = new Set(other ? busyChanges(other,data).map(c => c.id) : []);
   const excluded = list(data.excluded);
   const cards = list(data.cards);
+  const zeroCategoryFunnel = kind === 'no_category_in_city' && list(data.funnel).every(step => Number(step?.count) === 0);
   return `<section class="result" data-side="${side}" aria-label="Подборка на ${esc(dateLabel(request.date))}">
     <div class="result-head"><h2>Подборка на ${esc(dateLabel(request.date))}</h2><div class="result-measure"><span class="response-time">ответ за ${responseTime(elapsedMs)}</span><span class="badge">${cards.length} из 3</span></div></div>
     <p class="meta">${esc(request.city)} · ${esc(request.category)} · ${esc(request.event_type)} · до ${esc(money(request.budget))}${request.duration ? ` · ${esc(request.duration)} ч` : ''}${request.language ? ` · ${esc(request.language)}` : ''}</p>
     <div class="outcome ${kind}"><h3>${title}</h3><div>${esc(data.message)}</div>${list(data.hints).map(h => hintHTML(h,request)).join('')}</div>
-    ${funnelHTML(data)}
+    ${kind === 'partial' || kind === 'none_match' ? `<section class="plan-b" data-plan-b aria-labelledby="plan-b-title-${side}"><div class="eyebrow">План Б · те же условия</div><h3 id="plan-b-title-${side}">Другие даты</h3><div data-plan-b-body>${planBLoadingHTML()}</div></section>` : ''}
+    ${zeroCategoryFunnel ? '' : funnelHTML(data)}
     <div class="cards">${cards.map((c,i) => cardHTML(c,i,cards,request,lost.has(c.id),otherRequest?.date)).join('')}</div>
     ${excluded.length ? `<details${arrivedBusy.size ? ' open' : ''}><summary>Не попали — почему (${excluded.length})</summary><ul class="excluded">${excluded.map(c =>
       `<li${arrivedBusy.has(c.id) ? ' class="busy-change"' : ''}><strong>${esc(c.name)}</strong> ${synthetic(c)}<p>${esc(list(c.reasons).join('; '))}</p>${arrivedBusy.has(c.id) ? '<span class="change-note">Был в подборке на другую дату; сейчас занят</span>' : ''}</li>`).join('')}</ul></details>` : ''}
@@ -447,8 +497,10 @@ function resultHTML(data, request, other, otherRequest, side, elapsedMs) {
 }
 async function run(request, secondDate = null) {
   const current = ++generation;
-  active?.abort(); const controller = new AbortController(); active = controller;
+  active?.abort(); cancelPlanB(); const controller = new AbortController(); active = controller;
   const timeout = setTimeout(() => controller.abort(),45000);
+  lastRequest = null; renderedRequests = []; out.className = 'results';
+  out.innerHTML = '<p class="empty">Проверяем условия…</p>';
   pending = true; buttons(); out.setAttribute('aria-busy','true'); note(secondDate ? 'Сравниваем одинаковые условия на две даты…' : 'Проверяем условия…');
   const send = async body => {
     const started = performance.now();
@@ -464,12 +516,16 @@ async function run(request, secondDate = null) {
     lastRequest = {...request}; renderedRequests = secondRequest ? [request,secondRequest] : [request]; out.className = secondDate ? 'results comparing' : 'results';
     out.innerHTML = resultHTML(results[0],request,results[1],secondRequest,0,replies[0].elapsedMs) +
       (secondRequest ? resultHTML(results[1],secondRequest,results[0],request,1,replies[1].elapsedMs) : '');
+    results.forEach((result,side) => {
+      if (result.outcome === 'partial' || result.outcome === 'none_match') void loadPlanB(renderedRequests[side],side,current);
+    });
     if (secondRequest) {
       const lost = busyChanges(results[0],results[1]);
       note(lost.length ? `На ${dateLabel(secondDate)} из первой подборки заняты: ${lost.map(c => c.name).join(', ')}. Они подсвечены.` : 'Сравнение готово. Среди первой подборки нет подтверждённых исключений из-за занятости на вторую дату.');
     } else note('');
   } catch (error) {
     if (current !== generation) return;
+    out.innerHTML = '<p class="empty">Результат пока недоступен. Повторите запрос.</p>';
     note(error.name === 'AbortError' ? 'Сервер не ответил за 45 секунд. Повторите запрос.' : error.message, true);
   } finally {
     clearTimeout(timeout);
@@ -505,17 +561,35 @@ nlText.addEventListener('input',() => {
   if (parsedSummaryCurrent) { parsedSummaryCurrent = false; invalidateResults('Описание изменилось. Разберите новый запрос, чтобы обновить подбор.'); }
   if (nlResult.textContent) nlResult.textContent = 'Описание изменилось. Нажмите «Разобрать» ещё раз.';
 });
+function applySuggestedRequest(request) {
+  clearMissing();
+  for (const name of Object.keys(FIELD_LABELS)) field(name).value = request[name] == null ? '' : String(request[name]);
+  field('budget').setCustomValidity(''); field('duration').setCustomValidity('');
+  if (parsedSummaryCurrent) { parsedSummaryCurrent = false; nlResult.textContent = 'Условия изменены по подсказке. Проверьте дату и бюджет в форме.'; }
+  invalidateResults('');
+  const valid = readRequest();
+  if (valid) run(valid);
+}
 out.addEventListener('click',event => {
+  const dateOption = event.target.closest('[data-plan-b-date]');
+  if (dateOption && out.contains(dateOption)) {
+    const base = renderedRequests[Number(dateOption.closest('.result')?.dataset.side)];
+    const date = dateOption.dataset.planBDate;
+    if (base && /^\d{4}-\d{2}-\d{2}$/.test(date || '')) applySuggestedRequest({...base,date});
+    return;
+  }
+  const retry = event.target.closest('[data-plan-b-retry]');
+  if (retry && out.contains(retry)) {
+    const side = Number(retry.closest('.result')?.dataset.side), base = renderedRequests[side];
+    if (base) void loadPlanB(base,side,generation);
+    return;
+  }
   const action = event.target.closest('.hint-action');
   if (!action || !out.contains(action)) return;
   const base = renderedRequests[Number(action.closest('.result')?.dataset.side)];
   if (!base || !['date','budget'].includes(action.dataset.hintField)) return;
   const request = {...base,[action.dataset.hintField]:action.dataset.hintField === 'budget' ? Number(action.dataset.hintValue) : action.dataset.hintValue};
-  clearMissing();
-  for (const name of Object.keys(FIELD_LABELS)) field(name).value = request[name] == null ? '' : String(request[name]);
-  invalidateResults('');
-  const valid = readRequest();
-  if (valid) run(valid);
+  applySuggestedRequest(request);
 });
 compareDate.addEventListener('input', () => compareDate.setCustomValidity(''));
 compare.addEventListener('click', () => {
