@@ -1,5 +1,6 @@
 """Предрассчитанный индекс используется офлайн и не зависит от ключа API."""
 from datetime import date
+from dataclasses import replace
 import hashlib
 import json
 import math
@@ -53,6 +54,21 @@ def test_relevance_is_best_sentence_cosine_and_fallback_uses_markers(monkeypatch
     assert fallback.parts["semantic"] == 0.0
     assert fallback.marker_hits > 0
     assert fallback.parts["relevance"] != candidate.parts["relevance"]
+
+
+def test_profile_missing_from_index_uses_lexical_relevance(monkeypatch):
+    profile = next(p for p in load_catalog() if p.id == "HK-30583")
+    extra = replace(profile, id="TEAM-NEW", synthetic=True, source="team")
+    req = MatchRequest("Алматы", date(2026, 10, 10), "свадьба", "Фотограф", 800_000)
+    candidate = Candidate(extra)
+    _score(candidate, req)
+
+    monkeypatch.setattr(semantic, "INDEX", None)
+    fallback = Candidate(extra)
+    _score(fallback, req)
+    assert candidate.parts["semantic"] == 0.0
+    assert candidate.parts["relevance"] == fallback.parts["relevance"] > 0
+    assert candidate.score == fallback.score
 
 
 def test_semantic_order_is_deterministic_without_key_or_network(monkeypatch):

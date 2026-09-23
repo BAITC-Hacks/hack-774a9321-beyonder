@@ -80,10 +80,24 @@ class Candidate:
 
 
 def _sentences(text: str) -> list[str]:
-    parts = re.split(r"(?<=[.!?])\s+|\n+", text)
+    parts = re.split(r"(?<=[.!?])\s+|[•·;]+|\n+", text)
     # Для индекса нужны и короткие предложения; неполезные цитаты ниже
     # отсеиваются отдельно по длине и содержанию.
     return [p.strip() for p in parts if p.strip()]
+
+
+def _truncate_quote(text: str, limit: int) -> str | None:
+    """Не разрывает слово и явно помечает любое сокращение многоточием."""
+    if len(text) <= limit:
+        return text
+    if limit < 2:
+        return None
+    prefix = text[:limit - 1]
+    boundary = prefix.rfind(" ")
+    if boundary < 0:
+        return None
+    whole_words = prefix[:boundary].rstrip(" ,;:.!?…")
+    return whole_words + "…" if whole_words else None
 
 
 def _marker_hits(text: str, event_type: str) -> int:
@@ -122,16 +136,16 @@ def _check(c: Contractor, req: MatchRequest) -> list[tuple[str, str]]:
 def _score(cand: Candidate, req: MatchRequest) -> None:
     c = cand.c
     budget = max(0.0, 1.0 - c.price / req.budget)  # «цена от» — запас по бюджету ценен
-    if semantic.INDEX is None:
+    ranked = semantic.ranked_sentences(semantic.INDEX, c.id, c.description, req.event_type)
+    if not ranked:
         cand.snippet, cand.marker_hits = _best_snippet(c.description, req.event_type)
         specialist = 0.3 if len(c.formats) <= 2 else 0.0
         relevance = min(1.0, cand.marker_hits / 3) * 0.7 + specialist
         semantic_score = 0.0
     else:
-        ranked = semantic.ranked_sentences(semantic.INDEX, c.id, c.description, req.event_type)
-        cand.snippet = ranked[0][0] if ranked else None
+        cand.snippet = ranked[0][0]
         cand.marker_hits = 0
-        semantic_score = ranked[0][1] if ranked else 0.0
+        semantic_score = ranked[0][1]
         relevance = semantic_score
     if req.duration and c.max_hours is not None:
         hours = min(1.0, (c.max_hours - req.duration) / 4)
@@ -222,9 +236,10 @@ def _description_quote(cand: Candidate, req: MatchRequest, shown: list[Candidate
             if CONTEXT_DEPENDENT_LEAD.match(fragment):
                 continue
             if len(fragment) > 100:
-                fragment = fragment[:101].rsplit(" ", 1)[0]
-                fragment = re.sub(r"(?:\s+(?:и|с|со|на|для|по|в|от|из))+$", "", fragment)
-            fragment = fragment.rstrip(",;:.!?… ")
+                fragment = _truncate_quote(fragment, 100)
+                if fragment is None:
+                    continue
+            fragment = fragment.rstrip(",;:.!? ")
             if (len(fragment) < 16 or "«" in fragment or "»" in fragment
                     or explain_llm.has_generic_phrase(fragment)):
                 continue
@@ -306,8 +321,8 @@ def _explain(cand: Candidate, req: MatchRequest, facts: dict,
     if quote:
         # Сохраняем дословность цитаты и целые слова даже при тесной карточке.
         limit = min(100, 220 - len("В описании — «». ") - len(second))
-        if len(quote) > limit:
-            quote = quote[:limit + 1].rsplit(" ", 1)[0].rstrip(".!?… ")
+        quote = _truncate_quote(quote, limit)
+    if quote:
         first = f"В описании — «{quote}»."
     elif req.duration and c.max_hours is not None and c.max_hours != common_max_hours:
         first = f"До {c.max_hours} ч на площадке при запросе на {req.duration} ч."
