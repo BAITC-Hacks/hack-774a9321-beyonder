@@ -210,7 +210,7 @@ const EXAMPLES = {
   'no-city': {city:'Астана',date:'2026-10-10',event_type:'свадьба',category:'Лайв-бэнд',budget:800000},
   compare: {city:'Алматы',date:'2026-10-10',event_type:'свадьба',category:'Фотограф',budget:800000,secondDate:'2026-12-12'}
 };
-const SCORE_PARTS = {budget:['Бюджет','40%'],relevance:['Описание и формат','30%'],hours:['Часы','15%'],language:['Язык','10%'],data_quality:['Качество данных','5%']};
+const SCORE_PARTS = {budget:['Бюджет','40%'],relevance:['Описание и формат','30%'],semantic:['Смысл описания'],hours:['Часы','15%'],language:['Язык','10%'],data_quality:['Качество данных','5%']};
 const f = document.getElementById('f'), out = document.getElementById('out');
 const status = document.getElementById('status'), submit = document.getElementById('submit');
 const compare = document.getElementById('compare'), compareDate = document.getElementById('compare-date');
@@ -459,13 +459,15 @@ function scoreHTML(c) {
   const keys = [...Object.keys(SCORE_PARTS).filter(key => Object.hasOwn(parts,key)), ...Object.keys(parts).filter(key => !Object.hasOwn(SCORE_PARTS,key))]
     .filter(key => numeric(parts[key]));
   if (!keys.length) return '';
+  const legacyWeights = Object.keys(parts).length === 5 &&
+    ['budget','relevance','hours','language','data_quality'].every(key => numeric(parts[key]));
   const total = numeric(c.score) ? `<p class="score-total">Итог: ${(c.score*100).toLocaleString('ru-RU',{maximumFractionDigits:1})} из 100</p>` : '';
   return `<details class="score-details"><summary>Как посчитан рейтинг</summary>${total}<div class="score-list">${keys.map(key => {
     const value = Math.max(0,Math.min(100,Math.round(parts[key]*100)));
-    const label = SCORE_PARTS[key]?.[0] || key;
-    const weight = SCORE_PARTS[key]?.[1];
+    const label = SCORE_PARTS[key]?.[0] || `Дополнительный фактор (${key})`;
+    const weight = legacyWeights ? SCORE_PARTS[key]?.[1] : null;
     return `<div class="score-row"><div class="score-row-head"><span>${esc(label)}${weight ? ` · вес ${weight}` : ''}</span><span>${value} из 100</span></div><div class="score-track" aria-hidden="true"><span style="width:${value}%"></span></div></div>`;
-  }).join('')}</div><p class="score-note">Взвешенная сумма, не вероятность; при равенстве — по id.</p></details>`;
+  }).join('')}</div><p class="score-note">Оценки факторов показаны до учёта весов; итог учитывает веса и не является вероятностью. При равенстве — по id.</p></details>`;
 }
 function cardHTML(c, index, cards, request, changed, otherDate) {
   const source = c.explanation_source === 'llm' ? 'AI-объяснение' : c.explanation_source === 'template' ? 'Объяснение по данным' : '';
