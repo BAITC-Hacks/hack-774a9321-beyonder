@@ -237,6 +237,22 @@ def test_validator_accepts_description_quote_before_price():
     assert llm._validate(raw, payload, cards)[1] == []
 
 
+@pytest.mark.parametrize(("quote", "valid"), [
+    ("Резидент клуба импровизаторов Improv Konoha", True),
+    ("Резидент клуба импровизаторов…", True),
+    ("Резидент клуба импровиза…", False),
+    ("Резидент клуба импровизаторов", False),
+])
+def test_llm_quote_must_end_at_word_boundary_with_ellipsis(quote, valid):
+    source = "Резидент клуба импровизаторов Improv Konoha"
+    cards = [{"id": "one", "name": "Имя"}]
+    payload = {"request": {}, "context": {}, "cards": [{"price_from_kzt": 100,
+               "comparisons": [], "description_quote": source}]}
+    raw = json.dumps({"explanations": [f"В описании — «{quote}». Цена от 100 ₸."]})
+    _, errors = llm._validate(raw, payload, cards)
+    assert (not errors) is valid
+
+
 @pytest.mark.parametrize("lead", ["Такой", "Этот", "Он", "Она", "Там", "Поэтому"])
 def test_validator_rejects_contextless_quote(lead):
     quote = f"{lead} ведёт свадьбы на казахском языке"

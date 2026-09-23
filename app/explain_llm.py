@@ -14,7 +14,7 @@ import tempfile
 import threading
 import time
 
-PROMPT_VERSION = "relevance-8"
+PROMPT_VERSION = "relevance-9-word-boundary"
 TIMEOUT_SECONDS = 6.0  # общий бюджет обеих попыток, а не шесть секунд на каждую
 CACHE_FILE = Path(__file__).resolve().parent.parent / ".cache" / "explanations.json"
 _LOCK = threading.Lock()
@@ -39,8 +39,9 @@ SYSTEM_PROMPT = """Ты пишешь короткие объяснения по�
 Верни только JSON {"explanations": ["..."]}, строки строго в порядке карточек.
 На карточку РОВНО ДВА предложения, вместе не более 220 символов.
 Первое: если description_quote есть, используй форму: В описании — «ЦИТАТА».
-где ЦИТАТА — дословная непрерывная подстрока description_quote длиной до 100
-символов. В самом ответе используй только одну пару кавычек «…» вокруг цитаты.
+где ЦИТАТА — description_quote целиком либо его начало, сокращённое только
+после целого слова и со знаком … перед закрывающей кавычкой. Не обрывай слово.
+В самом ответе используй только одну пару кавычек «…» вокруг цитаты.
 Предпочти конкретные числа, вместимость, опыт. Если description_quote нет —
 укажи отличие по часам или языку, но не общее для всех показанных карточек.
 Второе: начни точно «Цена от <price_from_kzt> ₸»; при price_imputed=true добавь
@@ -80,6 +81,19 @@ def _json(value) -> str:
 
 def _normal(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip().casefold()
+
+
+def _grounded_quote(quote: str, source: str) -> bool:
+    """Цитата целиком либо её начальные целые слова с явным многоточием."""
+    quote, source = _normal(quote), _normal(source)
+    if len(quote) < 8:
+        return False
+    if quote == source:
+        return True
+    if not quote.endswith("…") or not source.startswith(quote[:-1]):
+        return False
+    end = len(quote) - 1
+    return end < len(source) and (source[end].isspace() or source[end] in ",;:.!?")
 
 
 def _numbers(text: str) -> set[str]:
@@ -123,10 +137,10 @@ def _validate(raw: str, payload: dict, cards: list[dict]) -> tuple[list[str] | N
         if any(re.match(r"^(?:такой|такая|такое|такие|этот|эта|это|эти|он|она|они|там|поэтому)\b",
                         q, re.IGNORECASE) for q in quotes):
             errors.append(prefix + "цитата начинается без контекста")
-        description = _normal(facts.get("description_quote") or "")
-        grounded_quote = any(len(q) >= 8 and _normal(q) in description for q in quotes)
+        description = facts.get("description_quote") or ""
+        grounded_quote = any(_grounded_quote(q, description) for q in quotes)
         if description and not grounded_quote:
-            errors.append(prefix + "используй дословную цитату description_quote первым основанием")
+            errors.append(prefix + "цитируй description_quote целиком либо сокращай по целому слову с …")
         if _FIRST_PERSON.search(outside_quotes):
             errors.append(prefix + "первое лицо из описания допустимо только внутри цитаты")
         first = re.split(r"[.!?…]+(?:\s+|$)", _QUOTES.sub("ЦИТАТА", text), maxsplit=1)[0]
@@ -163,7 +177,8 @@ def _validate(raw: str, payload: dict, cards: list[dict]) -> tuple[list[str] | N
         allowed = _json({"facts": facts, "request": payload["request"], "context": payload["context"]})
         if _numbers(text) - _numbers(allowed):
             errors.append(prefix + "есть числа, которых нет в фактах этой карточки")
-        if any(_normal(q) not in _normal(allowed) for q in quotes):
+        if any(not _grounded_quote(q, description) and _normal(q) not in _normal(allowed)
+               for q in quotes):
             errors.append(prefix + "есть цитата, которой нет во входных фактах")
         required = facts.get("required_comparison")
         comparisons = facts.get("comparisons", [])
