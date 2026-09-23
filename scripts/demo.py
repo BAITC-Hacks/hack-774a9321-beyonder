@@ -21,6 +21,7 @@ CASES = [
 NL_TEXT = "Нужен ведущий на казахскую свадьбу 14 ноября в Алматы, бюджет до 800 тысяч, часов на 6"
 NL_EXPECTED = dict(city="Алматы", date="2026-11-14", event_type="свадьба",
                    category="Ведущий", budget=800000, duration=6, language=None)
+PLAN_B = {**BASE, "date": "2026-12-12"}
 
 
 def word_form(count: int, one: str, few: str, many: str) -> str:
@@ -110,12 +111,44 @@ def check_nl(base_url: str, results: dict, failures: list[str]) -> None:
     print("FAIL: " + "; ".join(errors) if errors else "PASS")
 
 
+def check_alternatives(base_url: str, results: dict, failures: list[str]) -> None:
+    """«План Б» → /api/alternatives: на занятую дату предлагаются ближайшие даты с полной подборкой."""
+    print(f"\n=== plan-b: «План Б» для 12 декабря ===\n{json.dumps(PLAN_B, ensure_ascii=False)}")
+    try:
+        data = post(base_url, PLAN_B, "/api/alternatives")
+    except HTTPError as exc:
+        if exc.code == 404:
+            print("SKIP: на сервере нет /api/alternatives")
+            return
+        print(f"HTTP {exc.code}: {exc.read().decode('utf-8', errors='replace')}")
+        failures.append("plan-b")
+        return
+    except (URLError, TimeoutError, OSError, ValueError) as exc:
+        print(f"API недоступен или ответ некорректен: {exc}")
+        failures.append("plan-b")
+        return
+    results["plan-b"] = {"request": PLAN_B, "response": data}
+    print(f"message: {data.get('message')}")
+    options = data.get("options") or []
+    for option in options:
+        print(f"  {option['label']} ({option['weekday']}): проходят {option['passed']} — {', '.join(option['top'])}")
+    errors = []
+    if (data.get("base") or {}).get("passed") != 1:
+        errors.append(f"на 12 декабря ожидался 1 подходящий, получено {(data.get('base') or {}).get('passed')}")
+    if not options or options[0].get("date") != "2026-12-13" or options[0].get("passed", 0) < 3:
+        errors.append("первой ожидалась дата 2026-12-13 с полной подборкой")
+    if not data.get("message"):
+        errors.append("пустое message")
+    failures.extend(f"plan-b: {error}" for error in errors)
+    print("FAIL: " + "; ".join(errors) if errors else "PASS")
+
+
 def main() -> int:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base-url", default="http://localhost:8000")
-    parser.add_argument("--case", choices=[x[0] for x in CASES] + ["nl"], help="Запустить один сценарий")
+    parser.add_argument("--case", choices=[x[0] for x in CASES] + ["nl", "plan-b"], help="Запустить один сценарий")
     parser.add_argument("--save", type=Path, help="Сохранить фактические запросы и ответы в JSON")
     args = parser.parse_args()
     results, failures = {}, []
@@ -152,6 +185,8 @@ def main() -> int:
             failures.append("Смена даты: ожидалось исключение всех трёх октябрьских кандидатов по занятости")
     if not args.case or args.case == "nl":
         check_nl(args.base_url, results, failures)
+    if not args.case or args.case == "plan-b":
+        check_alternatives(args.base_url, results, failures)
     if args.save and not failures:
         args.save.parent.mkdir(parents=True, exist_ok=True)
         args.save.write_text(json.dumps(results, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
