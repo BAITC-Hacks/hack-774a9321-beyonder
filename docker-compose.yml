@@ -3,9 +3,12 @@ services:
     build: .
     image: beyonder:local
     ports:
-      - "${PORT:-8000}:8000"
+      - "127.0.0.1:${PORT:-8000}:8000"
     environment:
       # Необязательно: без ключа подбор и объяснения по данным работают полностью.
+      LLM_PROVIDER: ${LLM_PROVIDER:-openai}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      NVIDIA_API_KEY: ${NVIDIA_API_KEY:-}
+      NVIDIA_MODEL: ${NVIDIA_MODEL:-}
       EXPLANATIONS_LLM_ENABLED: ${EXPLANATIONS_LLM_ENABLED:-true}
