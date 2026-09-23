@@ -1,0 +1,510 @@
+{
+  "dense": {
+    "request": {
+      "city": "Алматы",
+      "date": "2026-10-10",
+      "event_type": "свадьба",
+      "category": "Фотограф",
+      "budget": 800000,
+      "duration": null,
+      "language": null
+    },
+    "response": {
+      "request": {
+        "city": "Алматы",
+        "date": "2026-10-10",
+        "event_type": "свадьба",
+        "category": "Фотограф",
+        "budget": 800000,
+        "duration": null,
+        "language": null
+      },
+      "outcome": "found",
+      "message": "Из 8 подрядчиков категории «Фотограф» в городе Алматы условиям соответствуют 3; показаны 3 лучших.",
+      "cards": [
+        {
+          "id": "HK-30583",
+          "name": "Леорио Паради",
+          "categories": [
+            "Фотограф"
+          ],
+          "city": "Алматы",
+          "price_from_kzt": 350000,
+          "languages": [
+            "английский",
+            "русский"
+          ],
+          "max_hours": 8,
+          "event_formats": [
+            "конференция",
+            "корпоратив",
+            "свадьба"
+          ],
+          "synthetic": false,
+          "source": "organizers",
+          "price_imputed": false,
+          "city_imputed": false,
+          "score": 0.626667,
+          "score_parts": {
+            "budget": 0.562,
+            "relevance": 0.7,
+            "hours": 0.5,
+            "language": 0.667,
+            "data_quality": 1.0
+          },
+          "explanation": "В описании прямо про ваш формат: «Являюсь свадебным фотографом.». Цена от 350 000 ₸ — 44% вашего бюджета; свободен 10 октября, когда заняты 4 из 8 в этой категории."
+        },
+        {
+          "id": "HK-16628",
+          "name": "Нобара Кугисаки",
+          "categories": [
+            "Фотограф"
+          ],
+          "city": "Алматы",
+          "price_from_kzt": 600000,
+          "languages": [
+            "английский",
+            "русский"
+          ],
+          "max_hours": 12,
+          "event_formats": [
+            "корпоратив",
+            "свадьба"
+          ],
+          "synthetic": false,
+          "source": "organizers",
+          "price_imputed": false,
+          "city_imputed": false,
+          "score": 0.521667,
+          "score_parts": {
+            "budget": 0.25,
+            "relevance": 0.767,
+            "hours": 0.5,
+            "language": 0.667,
+            "data_quality": 1.0
+          },
+          "explanation": "В описании прямо про ваш формат: «Является свадебным и репортажным фотографом, умеет ловить живые эмоции и передавать атмосферу события через искренние, естественные кадры.». Цена от 600 000 ₸ — 75% вашего бюджета, самый дорогой в подборке, но в рамках бюджета; свободен 10 октября, когда заняты 4 из 8 в этой категории."
+        },
+        {
+          "id": "HK-53108",
+          "name": "Альфонс Элрик",
+          "categories": [
+            "Фотограф"
+          ],
+          "city": "Алматы",
+          "price_from_kzt": 300000,
+          "languages": [
+            "английский",
+            "русский"
+          ],
+          "max_hours": 6,
+          "event_formats": [
+            "день рождения",
+            "свадьба"
+          ],
+          "synthetic": false,
+          "source": "organizers",
+          "price_imputed": true,
+          "city_imputed": false,
+          "score": 0.506667,
+          "score_parts": {
+            "budget": 0.625,
+            "relevance": 0.3,
+            "hours": 0.5,
+            "language": 0.667,
+            "data_quality": 0.5
+          },
+          "explanation": "Узкая специализация: берёт только день рождения, свадьба. Цена от 300 000 ₸ — 38% вашего бюджета, самый доступный в подборке (цена оценочная); свободен 10 октября, когда заняты 4 из 8 в этой категории."
+        }
+      ],
+      "excluded": [
+        {
+          "id": "HK-20640",
+          "name": "Шикамару Нара",
+          "synthetic": false,
+          "reasons": [
+            "не берёт формат «свадьба»"
+          ]
+        },
+        {
+          "id": "HK-35913",
+          "name": "Тохру",
+          "synthetic": false,
+          "reasons": [
+            "занят 10 октября",
+            "не берёт формат «свадьба»"
+          ]
+        },
+        {
+          "id": "HK-68220",
+          "name": "Рок Ли",
+          "synthetic": false,
+          "reasons": [
+            "занят 10 октября"
+          ]
+        },
+        {
+          "id": "HK-76268",
+          "name": "Сацуки Кусакабэ",
+          "synthetic": false,
+          "reasons": [
+            "занят 10 октября"
+          ]
+        },
+        {
+          "id": "HK-91112",
+          "name": "Мэгуми Фушигуро",
+          "synthetic": false,
+          "reasons": [
+            "занят 10 октября"
+          ]
+        }
+      ],
+      "hints": []
+    }
+  },
+  "rare": {
+    "request": {
+      "city": "Алматы",
+      "date": "2026-10-10",
+      "event_type": "свадьба",
+      "category": "Флорист",
+      "budget": 800000,
+      "duration": null,
+      "language": null
+    },
+    "response": {
+      "request": {
+        "city": "Алматы",
+        "date": "2026-10-10",
+        "event_type": "свадьба",
+        "category": "Флорист",
+        "budget": 800000,
+        "duration": null,
+        "language": null
+      },
+      "outcome": "partial",
+      "message": "Из 2 подрядчиков категории «Флорист» в городе Алматы условиям соответствуют только 1. Остальные: 1 заняты 10 октября.",
+      "cards": [
+        {
+          "id": "HK-39372",
+          "name": "Тони Тони Чоппер",
+          "categories": [
+            "Флорист"
+          ],
+          "city": "Алматы",
+          "price_from_kzt": 200000,
+          "languages": [
+            "русский"
+          ],
+          "max_hours": null,
+          "event_formats": [
+            "конференция",
+            "корпоратив",
+            "свадьба",
+            "юбилей"
+          ],
+          "synthetic": false,
+          "source": "organizers",
+          "price_imputed": true,
+          "city_imputed": false,
+          "score": 0.508333,
+          "score_parts": {
+            "budget": 0.75,
+            "relevance": 0.0,
+            "hours": 1.0,
+            "language": 0.333,
+            "data_quality": 0.5
+          },
+          "explanation": "Берёт формат «свадьба» среди 4 форматов. Цена от 200 000 ₸ — 25% вашего бюджета (цена оценочная); работа не привязана к часам на площадке; свободен 10 октября, когда заняты 1 из 2 в этой категории."
+        }
+      ],
+      "excluded": [
+        {
+          "id": "HK-90001",
+          "name": "Тихиро Огино",
+          "synthetic": true,
+          "reasons": [
+            "занят 10 октября"
+          ]
+        }
+      ],
+      "hints": [
+        "Тихиро Огино подходит по всем условиям, кроме даты: ближайший свободный день — 11 октября."
+      ]
+    }
+  },
+  "no-category": {
+    "request": {
+      "city": "Астана",
+      "date": "2026-10-10",
+      "event_type": "свадьба",
+      "category": "Лайв-бэнд",
+      "budget": 800000,
+      "duration": null,
+      "language": null
+    },
+    "response": {
+      "request": {
+        "city": "Астана",
+        "date": "2026-10-10",
+        "event_type": "свадьба",
+        "category": "Лайв-бэнд",
+        "budget": 800000,
+        "duration": null,
+        "language": null
+      },
+      "outcome": "no_category_in_city",
+      "cards": [],
+      "excluded": [],
+      "hints": [],
+      "message": "В городе Астана нет подрядчиков категории «Лайв-бэнд». Эта категория есть в: Алматы."
+    }
+  },
+  "none": {
+    "request": {
+      "city": "Алматы",
+      "date": "2026-10-10",
+      "event_type": "свадьба",
+      "category": "Фотограф",
+      "budget": 1,
+      "duration": null,
+      "language": null
+    },
+    "response": {
+      "request": {
+        "city": "Алматы",
+        "date": "2026-10-10",
+        "event_type": "свадьба",
+        "category": "Фотограф",
+        "budget": 1,
+        "duration": null,
+        "language": null
+      },
+      "outcome": "none_match",
+      "message": "Из 8 подрядчиков категории «Фотограф» в городе Алматы ни один не проходит по условиям: 8 дороже бюджета 1 ₸, 4 заняты 10 октября, 2 не берут формат «свадьба».",
+      "cards": [],
+      "excluded": [
+        {
+          "id": "HK-16628",
+          "name": "Нобара Кугисаки",
+          "synthetic": false,
+          "reasons": [
+            "цена от 600 000 ₸ выше бюджета 1 ₸"
+          ]
+        },
+        {
+          "id": "HK-20640",
+          "name": "Шикамару Нара",
+          "synthetic": false,
+          "reasons": [
+            "цена от 150 000 ₸ выше бюджета 1 ₸",
+            "не берёт формат «свадьба»"
+          ]
+        },
+        {
+          "id": "HK-30583",
+          "name": "Леорио Паради",
+          "synthetic": false,
+          "reasons": [
+            "цена от 350 000 ₸ выше бюджета 1 ₸"
+          ]
+        },
+        {
+          "id": "HK-35913",
+          "name": "Тохру",
+          "synthetic": false,
+          "reasons": [
+            "занят 10 октября",
+            "цена от 400 000 ₸ выше бюджета 1 ₸",
+            "не берёт формат «свадьба»"
+          ]
+        },
+        {
+          "id": "HK-53108",
+          "name": "Альфонс Элрик",
+          "synthetic": false,
+          "reasons": [
+            "цена от 300 000 ₸ выше бюджета 1 ₸"
+          ]
+        },
+        {
+          "id": "HK-68220",
+          "name": "Рок Ли",
+          "synthetic": false,
+          "reasons": [
+            "занят 10 октября",
+            "цена от 190 000 ₸ выше бюджета 1 ₸"
+          ]
+        },
+        {
+          "id": "HK-76268",
+          "name": "Сацуки Кусакабэ",
+          "synthetic": false,
+          "reasons": [
+            "занят 10 октября",
+            "цена от 200 000 ₸ выше бюджета 1 ₸"
+          ]
+        },
+        {
+          "id": "HK-91112",
+          "name": "Мэгуми Фушигуро",
+          "synthetic": false,
+          "reasons": [
+            "занят 10 октября",
+            "цена от 300 000 ₸ выше бюджета 1 ₸"
+          ]
+        }
+      ],
+      "hints": [
+        "При бюджете от 300 000 ₸ подошёл бы Альфонс Элрик — он свободен и берёт этот формат."
+      ]
+    }
+  },
+  "december": {
+    "request": {
+      "city": "Алматы",
+      "date": "2026-12-12",
+      "event_type": "свадьба",
+      "category": "Фотограф",
+      "budget": 800000,
+      "duration": null,
+      "language": null
+    },
+    "response": {
+      "request": {
+        "city": "Алматы",
+        "date": "2026-12-12",
+        "event_type": "свадьба",
+        "category": "Фотограф",
+        "budget": 800000,
+        "duration": null,
+        "language": null
+      },
+      "outcome": "partial",
+      "message": "Из 8 подрядчиков категории «Фотограф» в городе Алматы условиям соответствуют только 1. Остальные: 6 заняты 12 декабря, 2 не берут формат «свадьба».",
+      "cards": [
+        {
+          "id": "HK-76268",
+          "name": "Сацуки Кусакабэ",
+          "categories": [
+            "Фотограф"
+          ],
+          "city": "Алматы",
+          "price_from_kzt": 200000,
+          "languages": [
+            "русский"
+          ],
+          "max_hours": 10,
+          "event_formats": [
+            "свадьба",
+            "той"
+          ],
+          "synthetic": false,
+          "source": "organizers",
+          "price_imputed": false,
+          "city_imputed": false,
+          "score": 0.688333,
+          "score_parts": {
+            "budget": 0.75,
+            "relevance": 0.767,
+            "hours": 0.5,
+            "language": 0.333,
+            "data_quality": 1.0
+          },
+          "explanation": "В описании прямо про ваш формат: «Я Сацуки Кусакабэ — свадебный фотограф.». Цена от 200 000 ₸ — 25% вашего бюджета; свободен 12 декабря, когда заняты 6 из 8 в этой категории."
+        }
+      ],
+      "excluded": [
+        {
+          "id": "HK-16628",
+          "name": "Нобара Кугисаки",
+          "synthetic": false,
+          "reasons": [
+            "занят 12 декабря"
+          ]
+        },
+        {
+          "id": "HK-20640",
+          "name": "Шикамару Нара",
+          "synthetic": false,
+          "reasons": [
+            "не берёт формат «свадьба»"
+          ]
+        },
+        {
+          "id": "HK-30583",
+          "name": "Леорио Паради",
+          "synthetic": false,
+          "reasons": [
+            "занят 12 декабря"
+          ]
+        },
+        {
+          "id": "HK-35913",
+          "name": "Тохру",
+          "synthetic": false,
+          "reasons": [
+            "занят 12 декабря",
+            "не берёт формат «свадьба»"
+          ]
+        },
+        {
+          "id": "HK-53108",
+          "name": "Альфонс Элрик",
+          "synthetic": false,
+          "reasons": [
+            "занят 12 декабря"
+          ]
+        },
+        {
+          "id": "HK-68220",
+          "name": "Рок Ли",
+          "synthetic": false,
+          "reasons": [
+            "занят 12 декабря"
+          ]
+        },
+        {
+          "id": "HK-91112",
+          "name": "Мэгуми Фушигуро",
+          "synthetic": false,
+          "reasons": [
+            "занят 12 декабря"
+          ]
+        }
+      ],
+      "hints": [
+        "Нобара Кугисаки подходит по всем условиям, кроме даты: ближайший свободный день — 13 декабря.",
+        "Леорио Паради подходит по всем условиям, кроме даты: ближайший свободный день — 14 декабря."
+      ]
+    }
+  },
+  "invalid": {
+    "request": {
+      "city": "Алматы",
+      "date": "2027-01-01",
+      "event_type": "свадьба",
+      "category": "Фотограф",
+      "budget": 800000,
+      "duration": null,
+      "language": null
+    },
+    "response": {
+      "request": {
+        "city": "Алматы",
+        "date": "2027-01-01",
+        "event_type": "свадьба",
+        "category": "Фотограф",
+        "budget": 800000,
+        "duration": null,
+        "language": null
+      },
+      "outcome": "invalid_request",
+      "cards": [],
+      "excluded": [],
+      "hints": [],
+      "message": "Календари подрядчиков известны только с 23 сентября по 31 декабря 2026 — на эту дату занятость проверить нельзя."
+    }
+  }
+}
