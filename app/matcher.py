@@ -136,16 +136,16 @@ def _check(c: Contractor, req: MatchRequest) -> list[tuple[str, str]]:
 def _score(cand: Candidate, req: MatchRequest) -> None:
     c = cand.c
     budget = max(0.0, 1.0 - c.price / req.budget)  # «цена от» — запас по бюджету ценен
-    if semantic.INDEX is None:
+    ranked = semantic.ranked_sentences(semantic.INDEX, c.id, c.description, req.event_type)
+    if not ranked:
         cand.snippet, cand.marker_hits = _best_snippet(c.description, req.event_type)
         specialist = 0.3 if len(c.formats) <= 2 else 0.0
         relevance = min(1.0, cand.marker_hits / 3) * 0.7 + specialist
         semantic_score = 0.0
     else:
-        ranked = semantic.ranked_sentences(semantic.INDEX, c.id, c.description, req.event_type)
-        cand.snippet = ranked[0][0] if ranked else None
+        cand.snippet = ranked[0][0]
         cand.marker_hits = 0
-        semantic_score = ranked[0][1] if ranked else 0.0
+        semantic_score = ranked[0][1]
         relevance = semantic_score
     if req.duration and c.max_hours is not None:
         hours = min(1.0, (c.max_hours - req.duration) / 4)
