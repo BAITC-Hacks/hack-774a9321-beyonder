@@ -103,7 +103,8 @@ def test_single_batch_strict_json_and_persistent_cache(bundle, fake_sdk):
     assert clients[0]["timeout"] == 6.0
     facts = json.loads(calls[0]["messages"][1]["content"])
     assert len(facts["cards"]) == len(b.cards) == 3
-    assert all("comparisons" in c and "score" not in c and "name" not in c for c in facts["cards"])
+    assert all("comparisons" in c and "required_comparison" in c
+               and "score" not in c and "name" not in c for c in facts["cards"])
     cache = json.loads(llm.CACHE_FILE.read_text(encoding="utf-8"))
     assert list(cache) == [llm._cache_key(asdict(b.req), b.cards)]
     assert len(next(iter(cache))) == 64
@@ -290,6 +291,16 @@ def test_validator_rejects_shared_languages_as_first_reason():
         "Работает на казахском и русском. Цена от 200 ₸.",
     ]})
     assert any("языки общие" in error for error in llm._validate(raw, payload, cards)[1])
+
+
+def test_validator_requires_preselected_price_comparison(bundle):
+    first = bundle.texts[0]
+    comparison = bundle.payload["cards"][0]["required_comparison"]
+    assert comparison and comparison in first
+    raw = json.dumps({"explanations": [first.replace("; " + comparison, ""),
+                                        *bundle.texts[1:]]}, ensure_ascii=False)
+    assert any("required_comparison" in error
+               for error in llm._validate(raw, bundle.payload, bundle.cards)[1])
 
 
 def test_total_timeout_includes_validation_retry(bundle, fake_sdk, monkeypatch):

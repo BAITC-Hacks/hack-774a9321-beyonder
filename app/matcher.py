@@ -242,6 +242,10 @@ def _description_quote(cand: Candidate, req: MatchRequest, shown: list[Candidate
 
 def _explanation_facts(cand: Candidate, req: MatchRequest, shown: list[Candidate]) -> dict:
     c = cand.c
+    comparisons = _comparisons(cand, shown)
+    required_comparison = next((part for part in comparisons if "₸" in part), None)
+    if required_comparison is None:
+        required_comparison = next((part for part in comparisons if " ч" in part), None)
     return {
         "id": c.id, "price_from_kzt": c.price,
         "budget_percent": round(100 * c.price / req.budget),
@@ -249,16 +253,14 @@ def _explanation_facts(cand: Candidate, req: MatchRequest, shown: list[Candidate
         "event_formats": sorted(c.formats), "languages": sorted(c.languages),
         "max_hours": c.max_hours, "requested_duration": req.duration,
         "description_quote": _description_quote(cand, req, shown),
-        "comparisons": _comparisons(cand, shown),
+        "comparisons": comparisons, "required_comparison": required_comparison,
     }
 
 
 def _explain(cand: Candidate, req: MatchRequest, facts: dict,
              common_max_hours: int | None) -> str:
     c = cand.c
-    comparison = next((part for part in facts["comparisons"] if "₸" in part), None)
-    if comparison is None:
-        comparison = next((part for part in facts["comparisons"] if " ч" in part), None)
+    comparison = facts["required_comparison"]
     price = f"Цена от {fmt_kzt(c.price)} — {facts['budget_percent']}% бюджета"
     if c.price_imputed:
         price += " (цена оценочная)"
