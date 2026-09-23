@@ -161,6 +161,16 @@ def test_demo_messages_use_correct_agreement(catalog):
     assert "4 из 8 заняты" in none["message"]
 
 
+def test_venue_cards_lead_with_distinct_details(catalog):
+    req = MatchRequest("Алматы", date(2026, 10, 10), "свадьба", "Банкетный зал", 5_000_000)
+    cards = match(req, catalog)["cards"]
+    leads = [card["explanation"].split(". Цена от ", 1)[0] for card in cards]
+    assert len(leads) == len(set(leads)) == 3
+    assert all(lead.startswith("В описании — «") for lead in leads)
+    assert any("панорамная локация" in lead for lead in leads)
+    assert any("казахской кухни" in lead for lead in leads)
+
+
 def test_http_contract():
     with TestClient(app) as client:
         assert client.get("/api/meta").json()["profiles"] >= 66

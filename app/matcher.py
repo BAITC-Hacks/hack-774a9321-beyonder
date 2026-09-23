@@ -178,16 +178,28 @@ def _description_quote(cand: Candidate, req: MatchRequest, shown: list[Candidate
         fragments = ([sentence] if len(sentence) <= 100 else
                      [part.strip() for part in re.split(r"[,;:]", sentence)])
         for fragment in fragments:
+            fragment = re.sub(r"^(?:Он|Она|Они)\s+", "", fragment.strip(), flags=re.I)
+            fragment = re.sub(rf"^{re.escape(cand.c.name)}\s*[—–-]\s*", "", fragment, flags=re.I)
+            named_lead = re.match(r"^([^—–-]{2,40})\s+[—–]\s+(.+)$", fragment)
+            if named_lead and len(named_lead[1].split()) <= 4 and all(
+                    word[0].isupper() for word in named_lead[1].split()):
+                fragment = named_lead[2]
             if len(fragment) > 100:
                 fragment = fragment[:101].rsplit(" ", 1)[0]
-            fragment = re.sub(r"^(?:Он|Она|Они)\s+", "", fragment.strip(), flags=re.I)
+                fragment = re.sub(r"(?:\s+(?:и|с|со|на|для|по|в|от|из))+$", "", fragment)
             fragment = fragment.rstrip(",;:.!?… ")
             if (len(fragment) < 16 or "«" in fragment or "»" in fragment
                     or explain_llm.has_generic_phrase(fragment)):
                 continue
             event_hits = _marker_hits(fragment, req.event_type)
             scale = bool(re.search(r"\b\d+\s*(?:лет|год|заказ|проект|событ)|\b(?:семи|пяти|десяти)\s+лет\b|\bопыт", fragment, re.I))
-            subject = bool(re.search(r"фотограф|флорист|цветочн|оформлен|съ[её]мк|снима|вед[её]т|дизайн|музык|заказ|команд|клиент|стаж|лет", fragment, re.I))
+            subject = bool(re.search(
+                r"фотограф|флорист|цветочн|оформлен|съ[её]мк|снима|вед[её]т|дизайн|"
+                r"музык|заказ|команд|клиент|стаж|лет|ресторан|банкет|отел|площадк|"
+                r"локац|террас|панорам|кухн|интерьер|гор[аые]|вилл|декор|подар|"
+                r"сувенир|танц|ансамбл|шоу|сцен|звук|артист|видео|свет|гост|зал",
+                fragment, re.I,
+            ))
             if not (event_hits or scale or subject):
                 continue
             unique = all(fragment.casefold() not in desc for desc in others)
