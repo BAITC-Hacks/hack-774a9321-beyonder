@@ -5,7 +5,7 @@ from datetime import date
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 
 from .alternatives import alternatives
@@ -15,7 +15,12 @@ from .nl_parse import parse_request
 
 STATIC = Path(__file__).resolve().parent.parent / "static"
 
-app = FastAPI(title="Beyonder — умный подбор подрядчиков")
+class UTF8JSONResponse(JSONResponse):
+    # Явный charset: иначе Windows PowerShell 5.1 (Invoke-RestMethod) показывает кириллицу кракозябрами.
+    media_type = "application/json; charset=utf-8"
+
+
+app = FastAPI(title="Beyonder — умный подбор подрядчиков", default_response_class=UTF8JSONResponse)
 CATALOG = load_catalog()
 
 

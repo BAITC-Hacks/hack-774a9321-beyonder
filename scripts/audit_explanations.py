@@ -34,9 +34,13 @@ BUDGETS = (500_000, 1_500_000, 5_000_000)
 
 
 def sentences(text: str) -> list[str]:
-    # Точка внутри «цитаты» не завершает предложение.
-    outside = re.sub(r"«[^»]*»", "«…»", text)
-    return [s for s in re.split(r"(?<=[.!?])\s+(?=[А-ЯЁA-Z«])", outside.strip()) if s]
+    """Предложения исходного текста; точка внутри «цитаты» не завершает предложение."""
+    text = text.strip()
+    # Та же длина, что у исходника: границы ищем по маске, а режем оригинал.
+    masked = re.sub(r"«[^»]*»", lambda m: "«" + "x" * (len(m.group(0)) - 2) + "»", text)
+    cuts = [m.end() for m in re.finditer(r"(?<=[.!?])\s+(?=[А-ЯЁA-Z«])", masked)]
+    bounds = [0, *cuts, len(text)]
+    return [text[a:b].strip() for a, b in zip(bounds, bounds[1:]) if text[a:b].strip()]
 
 
 def main() -> int:
