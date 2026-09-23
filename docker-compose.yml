@@ -1,0 +1,11 @@
+services:
+  beyonder:
+    build: .
+    image: beyonder:local
+    ports:
+      - "${PORT:-8000}:8000"
+    environment:
+      # Необязательно: без ключа подбор и объяснения по данным работают полностью.
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      EXPLANATIONS_LLM_ENABLED: ${EXPLANATIONS_LLM_ENABLED:-true}
