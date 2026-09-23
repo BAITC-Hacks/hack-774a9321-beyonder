@@ -50,7 +50,7 @@ def alternatives(req: MatchRequest, catalog: list[Contractor]) -> dict:
     best_possible = min(MAX_CARDS, len(reachable))
     if best_possible == 0:
         blockers = _reason_summary([Candidate(c, fails=_check(c, req)) for c in pool], req)
-        return result(f"Дело не в дате: из {len(pool)} подрядчиков категории {blockers}. "
+        return result(f"Дело не в дате: из {len(pool)} подрядчиков категории: {blockers}. "
                       f"Смена даты не поможет — измените эти условия.")
     if len(base_passed) >= best_possible:
         return result(f"На {fmt_date(req.date)} уже лучшая возможная подборка — "
