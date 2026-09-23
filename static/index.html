@@ -45,6 +45,7 @@
   .nl-result .note-list { margin-top:9px; color:var(--muted); }
   .missing-field { border-color:#b85126; box-shadow:0 0 0 2px #ffe1ce; }
   .missing-summary { color:#8f3e18; font-weight:650; }
+  .field-error { color:#8f3e18; font-size:12px; font-weight:600; }
   .examples { margin:0 0 22px; }
   .examples .meta { display:block; margin-bottom:9px; }
   .example-list { display:flex; gap:8px; flex-wrap:wrap; }
@@ -220,6 +221,7 @@ const nlText = document.getElementById('nl-text'), parseButton = document.getEle
 const nlResult = document.getElementById('nl-result');
 const exampleList = document.getElementById('example-list');
 const FIELD_LABELS = {city:'город',date:'дата',event_type:'тип мероприятия',category:'категория',budget:'бюджет',duration:'длительность',language:'язык'};
+const FIELD_OBJECTS = {city:'город',date:'дату',event_type:'тип мероприятия',category:'категорию',budget:'бюджет',duration:'длительность',language:'язык'};
 const MONTHS = {'января':1,'февраля':2,'марта':3,'апреля':4,'мая':5,'июня':6,'июля':7,'августа':8,'сентября':9,'октября':10,'ноября':11,'декабря':12};
 const field = name => f.elements.namedItem(name);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -293,6 +295,8 @@ function clearMissing() {
   for (const name of Object.keys(FIELD_LABELS)) {
     field(name).classList.remove('missing-field');
     field(name).removeAttribute('aria-invalid');
+    field(name).removeAttribute('aria-describedby');
+    document.getElementById(`missing-${name}`)?.remove();
   }
 }
 function invalidateResults(message = 'Условия изменились. Нажмите «Подобрать подрядчиков», чтобы обновить результат.') {
@@ -311,6 +315,12 @@ function applyParams(params, missing = []) {
     if (!FIELD_LABELS[name]) continue;
     field(name).classList.add('missing-field');
     field(name).setAttribute('aria-invalid','true');
+    const error = document.createElement('span');
+    error.id = `missing-${name}`;
+    error.className = 'field-error';
+    error.textContent = `Не удалось определить ${FIELD_OBJECTS[name]} из описания. Заполните вручную.`;
+    field(name).closest('label').append(error);
+    field(name).setAttribute('aria-describedby',error.id);
   }
   field('budget').setCustomValidity(''); field('duration').setCustomValidity('');
 }
@@ -459,15 +469,16 @@ function scoreHTML(c) {
   const keys = [...Object.keys(SCORE_PARTS).filter(key => Object.hasOwn(parts,key)), ...Object.keys(parts).filter(key => !Object.hasOwn(SCORE_PARTS,key))]
     .filter(key => numeric(parts[key]));
   if (!keys.length) return '';
-  const legacyWeights = Object.keys(parts).length === 5 &&
+  const semanticAlias = numeric(parts.semantic) && numeric(parts.relevance) && parts.semantic === parts.relevance;
+  const knownWeights = keys.every(key => Object.hasOwn(SCORE_PARTS,key)) &&
     ['budget','relevance','hours','language','data_quality'].every(key => numeric(parts[key]));
   const total = numeric(c.score) ? `<p class="score-total">Итог: ${(c.score*100).toLocaleString('ru-RU',{maximumFractionDigits:1})} из 100</p>` : '';
   return `<details class="score-details"><summary>Как посчитан рейтинг</summary>${total}<div class="score-list">${keys.map(key => {
     const value = Math.max(0,Math.min(100,Math.round(parts[key]*100)));
     const label = SCORE_PARTS[key]?.[0] || `Дополнительный фактор (${key})`;
-    const weight = legacyWeights ? SCORE_PARTS[key]?.[1] : null;
+    const weight = knownWeights ? SCORE_PARTS[key]?.[1] : null;
     return `<div class="score-row"><div class="score-row-head"><span>${esc(label)}${weight ? ` · вес ${weight}` : ''}</span><span>${value} из 100</span></div><div class="score-track" aria-hidden="true"><span style="width:${value}%"></span></div></div>`;
-  }).join('')}</div><p class="score-note">Оценки факторов показаны до учёта весов; итог учитывает веса и не является вероятностью. При равенстве — по id.</p></details>`;
+  }).join('')}</div><p class="score-note">Оценки факторов показаны до учёта весов и округлены; итог рассчитан по точным значениям с указанными весами и не является вероятностью.${semanticAlias ? ' «Смысл описания» раскрывает оценку «Описание и формат» и отдельно не прибавляется.' : numeric(parts.semantic) ? ' Для этого профиля нет предрассчитанной оценки: «Описание и формат» оценивается по маркерам; «Смысл описания» отдельно не прибавляется.' : ''} При равенстве — по id.</p></details>`;
 }
 function cardHTML(c, index, cards, request, changed, otherDate) {
   const source = c.explanation_source === 'llm' ? 'AI-объяснение' : c.explanation_source === 'template' ? 'Объяснение по данным' : '';
@@ -543,7 +554,7 @@ f.addEventListener('input', event => {
   cancelParse('Форма изменена вручную. Чтобы использовать описание, нажмите «Разобрать» ещё раз.');
   if (parsedSummaryCurrent) { parsedSummaryCurrent = false; nlResult.textContent = 'Вы изменили форму после разбора. Проверьте условия и нажмите «Подобрать подрядчиков».'; }
   field('budget').setCustomValidity(''); field('duration').setCustomValidity('');
-  if (event.target.value) { event.target.classList.remove('missing-field'); event.target.removeAttribute('aria-invalid'); }
+  if (event.target.value) { event.target.classList.remove('missing-field'); event.target.removeAttribute('aria-invalid'); event.target.removeAttribute('aria-describedby'); document.getElementById(`missing-${event.target.name}`)?.remove(); }
   invalidateResults();
 });
 f.addEventListener('submit', event => { event.preventDefault(); cancelParse('Ручной подбор запущен. Для нового разбора нажмите «Разобрать».'); const request = readRequest(); if (request) run(request); });

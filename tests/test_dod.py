@@ -1,6 +1,7 @@
 """Definition of Done на исходном датасете, без сети и LLM."""
 from dataclasses import replace
 from datetime import date
+import re
 import httpx
 
 import pytest
@@ -8,7 +9,7 @@ from fastapi.testclient import TestClient
 
 from app.data import CALENDAR_END, CALENDAR_START, load_catalog
 from app.main import app
-from app.matcher import MatchRequest, fmt_kzt, match
+from app.matcher import MatchRequest, _sentences, fmt_kzt, match
 
 
 @pytest.fixture(autouse=True)
@@ -213,6 +214,35 @@ def test_run_on_host_bio_provides_specific_quote(catalog):
     assert any("дешевле" in highlight.lower() for highlight in host["highlights"])
     assert len({tuple(c["highlights"]) for c in result["cards"]}) == len(result["cards"])
     assert "казахский, русский" in result["message"]
+
+
+@pytest.mark.parametrize("separator", ["•", "·", ";", "\n"])
+def test_description_list_separators_are_sentence_boundaries(separator):
+    assert _sentences(f"Резидент клуба импровизаторов Improv Konoha {separator}Обладаю вокалом") == [
+        "Резидент клуба импровизаторов Improv Konoha", "Обладаю вокалом",
+    ]
+
+
+def test_sanji_quote_never_contains_next_bullet_or_half_word(catalog):
+    req = MatchRequest("Астана", date(2026, 11, 14), "свадьба", "Ведущий", 1_200_000)
+    card = next(c for c in match(req, catalog)["cards"] if c["id"] == "HK-80581")
+    quote = re.search(r"«([^»]+)»", card["explanation"]).group(1)
+    profile = next(c for c in catalog if c.id == "HK-80581")
+    assert quote in _sentences(profile.description)
+    assert "•" not in quote and "·" not in quote and ";" not in quote
+    assert "без" not in quote
+
+
+def test_long_quote_is_cut_at_word_boundary_with_ellipsis(catalog):
+    profile = next(c for c in catalog if c.id == "HK-80581")
+    description = "Ведущий проводит свадебные церемонии " + "и работает с разными гостями " * 8
+    profile = replace(profile, description=description, busy=frozenset())
+    req = MatchRequest("Астана", date(2026, 11, 14), "свадьба", "Ведущий", 1_200_000)
+    quote = re.search(r"«([^»]+)»", match(req, [profile])["cards"][0]["explanation"]).group(1)
+    assert quote.endswith("…")
+    assert len(quote) <= 100
+    assert description.startswith(quote[:-1])
+    assert description[len(quote) - 1] == " "
 
 
 def test_highlights_are_short_comparisons_and_distinct_for_ties(catalog):
