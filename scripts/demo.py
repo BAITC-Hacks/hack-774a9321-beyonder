@@ -20,6 +20,12 @@ CASES = [
 ]
 
 
+def word_form(count: int, one: str, few: str, many: str) -> str:
+    if 11 <= count % 100 <= 14:
+        return many
+    return {1: one, 2: few, 3: few, 4: few}.get(count % 10, many)
+
+
 def post(base_url: str, body: dict) -> dict:
     req = Request(base_url.rstrip("/") + "/api/match",
                   data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
@@ -70,9 +76,15 @@ def main() -> int:
             continue
         results[key] = {"request": body, "response": data}
         print(f"outcome: {data.get('outcome')}\nmessage: {data.get('message')}")
+        funnel = data.get("funnel")
+        if funnel:
+            print("Воронка: " + " → ".join(
+                f"{step['count']} {step['step']}" for step in funnel
+            ))
         for c in data.get("cards", []):
             badge = " [синтетический профиль]" if c.get("synthetic") else ""
-            print(f"  {c['id']} · {c['name']}{badge} · от {c['price_from_kzt']} ₸")
+            price = f"{c['price_from_kzt']:,}".replace(",", " ")
+            print(f"  {c['id']} · {c['name']}{badge} · от {price} ₸")
             print(f"  Почему: {c.get('explanation', '')}")
             if c.get("explanation_source"):
                 print(f"  Источник объяснения: {c['explanation_source']}")
@@ -93,10 +105,14 @@ def main() -> int:
         print(f"\nОктябрь → декабрь: заняты {', '.join(disappeared) or 'никто'}")
         if not october or not october.issubset(busy):
             failures.append("Смена даты: ожидалось исключение всех трёх октябрьских кандидатов по занятости")
-    if args.save:
+    if args.save and not failures:
         args.save.parent.mkdir(parents=True, exist_ok=True)
         args.save.write_text(json.dumps(results, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    print(f"\n{'FAIL' if failures else 'PASS'}: {len(results)} ответов, {len(failures)} ошибок")
+    elif args.save:
+        print("Результаты не сохранены: проверка сценариев завершилась с ошибками.")
+    print(f"\n{'FAIL' if failures else 'PASS'}: {len(results)} "
+          f"{word_form(len(results), 'ответ', 'ответа', 'ответов')}, "
+          f"{len(failures)} {word_form(len(failures), 'ошибка', 'ошибки', 'ошибок')}")
     for failure in failures:
         print(f"  {failure}")
     return 1 if failures else 0

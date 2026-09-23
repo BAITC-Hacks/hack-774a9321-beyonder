@@ -25,14 +25,26 @@
   .panel { background:white; border:1px solid var(--line); border-radius:18px; padding:24px; }
   form { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:16px; }
   label { display:flex; flex-direction:column; gap:7px; font-size:13px; font-weight:650; }
-  input, select, button { font:inherit; border-radius:8px; min-height:44px; }
-  input, select { width:100%; min-width:0; color:var(--ink); background:#fff; border:1px solid #b8c8bd; padding:9px 10px; }
+  input, select, textarea, button { font:inherit; border-radius:8px; min-height:44px; }
+  input, select, textarea { width:100%; min-width:0; color:var(--ink); background:#fff; border:1px solid #b8c8bd; padding:9px 10px; }
+  textarea { min-height:94px; resize:vertical; }
   button { border:0; padding:10px 18px; color:#fff; background:var(--green); font-weight:700; cursor:pointer; }
   button:hover:not(:disabled) { background:#104d38; }
   button:disabled { opacity:.5; cursor:wait; }
   button.secondary { background:#e6eee7; color:var(--ink); border:1px solid #bccfbf; }
   button.secondary:hover:not(:disabled) { background:#d7e6da; }
-  button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible { outline:3px solid #c78313; outline-offset:3px; }
+  button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible { outline:3px solid #c78313; outline-offset:3px; }
+  .nl { margin-bottom:22px; padding-bottom:22px; border-bottom:1px solid var(--line); }
+  .nl h2 { margin-bottom:6px; }
+  .nl label { margin:12px 0 10px; }
+  .nl-row { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+  .nl-row .meta { margin:0; flex:1; min-width:220px; }
+  .nl-result { margin-top:14px; padding:14px 16px; border-radius:10px; background:#eff6f0; }
+  .nl-result:empty { display:none; }
+  .nl-result ul { margin:7px 0 0; padding-left:20px; }
+  .nl-result .note-list { margin-top:9px; color:var(--muted); }
+  .missing-field { border-color:#b85126; box-shadow:0 0 0 2px #ffe1ce; }
+  .missing-summary { color:#8f3e18; font-weight:650; }
   .submit { align-self:end; }
   .form-note { margin-top:14px; }
   .compare-bar { margin:18px 0 26px; display:flex; align-items:end; gap:14px; flex-wrap:wrap; }
@@ -56,6 +68,9 @@
   .outcome.none_match { background:#fff0e8; border-left-color:#b85126; }
   .outcome.invalid_request { background:#fcecec; border-left-color:#a93535; }
   .hint { margin-top:9px; font-size:13px; }
+  .hint-action { display:block; width:100%; min-height:0; padding:8px 10px; text-align:left; font-size:13px; font-weight:500; color:var(--ink); background:#fff; border:1px solid #bdd4c3; }
+  .hint-action:hover:not(:disabled) { background:#e4f2e8; }
+  .hint-action span { font-weight:750; color:var(--green); text-decoration:underline; }
   .cards { display:grid; gap:13px; }
   .card { background:#fff; border:1px solid var(--line); border-radius:14px; padding:20px; overflow-wrap:anywhere; }
   .card-top { display:flex; gap:12px; align-items:start; margin-bottom:10px; }
@@ -86,7 +101,7 @@
   footer { border-top:1px solid var(--line); margin-top:36px; padding-top:18px; font-size:12px; color:var(--muted); }
   [hidden] { display:none !important; }
   @media(max-width:850px) { form { grid-template-columns:repeat(2,minmax(0,1fr)); } .results.comparing { grid-template-columns:1fr; } }
-  @media(max-width:500px) { main { padding:18px 16px 36px; } .panel { padding:16px; } form { grid-template-columns:1fr; } header .eyebrow { font-size:9px; } .compare-bar label, .compare-bar button { width:100%; } .hero { padding-top:26px; } }
+  @media(max-width:500px) { main { padding:18px 16px 36px; } .panel { padding:16px; } form { grid-template-columns:1fr; } header .eyebrow { font-size:9px; } .compare-bar label, .compare-bar button, .nl-row button { width:100%; } .hero { padding-top:26px; } }
 </style>
 </head>
 <body>
@@ -98,6 +113,15 @@
     <p class="muted">Укажите условия — мы проверим доступность и бюджет, а затем объясним, почему подходит каждый подрядчик.</p>
   </section>
   <section class="panel" aria-label="Условия подбора">
+    <div class="nl">
+      <h2>Опишите мероприятие своими словами</h2>
+      <p class="meta">Мы заполним форму тем, что удалось понять. Вы увидите исходные фразы и сможете исправить любое поле.</p>
+      <label for="nl-text">Что вам нужно?
+        <textarea id="nl-text" maxlength="1000" placeholder="Нужен фотограф на свадьбу в Алматы 14 ноября, бюджет 800 тысяч тенге"></textarea>
+      </label>
+      <div class="nl-row"><button id="parse" type="button" disabled>Разобрать</button><p class="meta">Город, дата, тип мероприятия, категория и бюджет нужны для подбора.</p></div>
+      <div id="nl-result" class="nl-result" role="status" aria-live="polite"></div>
+    </div>
     <form id="f">
       <label>Город <select name="city" required></select></label>
       <label>Дата <input type="date" name="date" required></label>
@@ -138,15 +162,20 @@ const f = document.getElementById('f'), out = document.getElementById('out');
 const status = document.getElementById('status'), submit = document.getElementById('submit');
 const compare = document.getElementById('compare'), compareDate = document.getElementById('compare-date');
 const retryMeta = document.getElementById('retry-meta'), catalogNote = document.getElementById('catalog-note');
+const nlText = document.getElementById('nl-text'), parseButton = document.getElementById('parse');
+const nlResult = document.getElementById('nl-result');
+const FIELD_LABELS = {city:'город',date:'дата',event_type:'тип мероприятия',category:'категория',budget:'бюджет',duration:'длительность',language:'язык'};
+const MONTHS = {'января':1,'февраля':2,'марта':3,'апреля':4,'мая':5,'июня':6,'июля':7,'августа':8,'сентября':9,'октября':10,'ноября':11,'декабря':12};
 const field = name => f.elements.namedItem(name);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const list = value => Array.isArray(value) ? value : [];
 const money = value => Number.isFinite(Number(value)) ? Number(value).toLocaleString('ru-RU') + ' ₸' : 'не указана';
 const dateLabel = value => /^\d{4}-\d{2}-\d{2}$/.test(value || '') ? value.split('-').reverse().join('.') : String(value || '');
 const synthetic = c => c.synthetic ? '<span class="badge synthetic">синтетический профиль</span>' : '';
-let ready = false, pending = false, lastRequest = null, generation = 0, active = null;
+let ready = false, pending = false, parsing = false, lastRequest = null, generation = 0, active = null;
+let parsedGeneration = 0, parseActive = null, renderedRequests = [];
 
-function buttons() { submit.disabled = !ready || pending; compare.disabled = !ready || pending || !lastRequest; }
+function buttons() { submit.disabled = !ready || pending; compare.disabled = !ready || pending || !lastRequest; parseButton.disabled = !ready || parsing; }
 function note(text, error = false) { status.className = text ? 'notice' + (error ? ' error' : '') : ''; status.textContent = text; }
 function apiError(data) {
   if (Array.isArray(data.detail)) return data.detail.map(x => `${list(x.loc).slice(1).join('.')}: ${x.msg || 'некорректное значение'}`).join('; ');
@@ -166,7 +195,7 @@ async function loadMeta() {
     const m = await fetchJSON('/api/meta', {signal:controller.signal});
     for (const [name, values] of [['city',m.cities],['event_type',m.event_types],['category',m.categories],['language',m.languages]]) {
       field(name).replaceChildren();
-      if (name === 'language') field(name).add(new Option('Любой',''));
+      field(name).add(new Option(name === 'language' ? 'Любой' : 'Выберите…',''));
       list(values).forEach(value => field(name).add(new Option(value,value)));
     }
     if (!list(m.cities).length || !list(m.categories).length || !list(m.event_types).length) throw new Error('Каталог пуст. Повторите загрузку позже.');
@@ -192,6 +221,67 @@ function readRequest() {
   return {city:d.city,date:d.date,event_type:d.event_type,category:d.category,budget:Number(d.budget),
     duration:d.duration ? Number(d.duration) : null,language:d.language || null};
 }
+function clearMissing() {
+  for (const name of Object.keys(FIELD_LABELS)) {
+    field(name).classList.remove('missing-field');
+    field(name).removeAttribute('aria-invalid');
+  }
+}
+function invalidateResults(message = 'Условия изменились. Нажмите «Подобрать подрядчиков», чтобы обновить результат.') {
+  if (!lastRequest && !pending) return;
+  generation++; active?.abort(); active = null; pending = false; lastRequest = null; renderedRequests = [];
+  out.className = 'results'; out.innerHTML = ''; out.setAttribute('aria-busy','false');
+  note(message); buttons();
+}
+function applyParams(params, missing = []) {
+  clearMissing();
+  for (const name of Object.keys(FIELD_LABELS)) {
+    if (params[name] != null) field(name).value = String(params[name]);
+    else field(name).value = '';
+  }
+  for (const name of missing) {
+    if (!FIELD_LABELS[name]) continue;
+    field(name).classList.add('missing-field');
+    field(name).setAttribute('aria-invalid','true');
+  }
+  field('budget').setCustomValidity(''); field('duration').setCustomValidity('');
+}
+function parsedHTML(data) {
+  const found = list(data.found), notes = list(data.notes), missing = list(data.missing);
+  return `<strong>Поняли из описания</strong>${found.length ? `<ul>${found.map(x =>
+    `<li>${esc(FIELD_LABELS[x.field] || x.field)} — <strong>${esc(x.field === 'date' ? dateLabel(x.value) : x.field === 'budget' ? money(x.value) : x.value)}</strong>${x.fragment ? ` <span class="meta">(из текста: «${esc(x.fragment)}»)</span>` : ''}</li>`).join('')}</ul>` : '<p class="meta">Пока ничего не распознано.</p>'}
+    ${missing.length ? `<p class="missing-summary">Уточните в подсвеченных полях: ${missing.map(x => esc(FIELD_LABELS[x] || x)).join(', ')}.</p>` : '<p class="meta">Обязательные условия найдены — запускаем подбор.</p>'}
+    ${notes.length ? `<ul class="note-list">${notes.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}`;
+}
+async function parseText() {
+  const value = nlText.value.trim();
+  if (!value) { nlResult.textContent = 'Введите описание мероприятия, затем нажмите «Разобрать».'; nlText.focus(); return; }
+  if (!ready || parsing) return;
+  invalidateResults('Разбираем описание мероприятия…');
+  const current = ++parsedGeneration;
+  parseActive?.abort(); const controller = new AbortController(); parseActive = controller;
+  const timeout = setTimeout(() => controller.abort(),15000);
+  parsing = true; buttons(); nlResult.textContent = 'Разбираем описание…';
+  try {
+    const data = await fetchJSON('/api/parse',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:value}),signal:controller.signal});
+    if (current !== parsedGeneration) return;
+    if (!data || !data.params || typeof data.params !== 'object' || !Array.isArray(data.missing) || !Array.isArray(data.found)) throw new Error('Сервер вернул неполный разбор запроса.');
+    applyParams(data.params,data.missing);
+    nlResult.innerHTML = parsedHTML(data);
+    if (!data.missing.length) {
+      const request = readRequest();
+      if (request) run(request);
+      else note('Проверьте подсвеченные ограничения формы, в том числе диапазон дат.',true);
+    } else { note('Заполните недостающие поля и запустите подбор.'); field(data.missing[0])?.focus(); }
+  } catch (error) {
+    if (current !== parsedGeneration) return;
+    nlResult.textContent = error.name === 'AbortError' ? 'Сервер не ответил на разбор за 15 секунд. Попробуйте ещё раз.' : error.message;
+    note(nlResult.textContent,true);
+  } finally {
+    clearTimeout(timeout);
+    if (current === parsedGeneration) { parsing = false; parseActive = null; buttons(); }
+  }
+}
 function busyChanges(from, to) {
   const shown = new Set(list(to.cards).map(c => c.id));
   const excluded = new Map(list(to.excluded).map(c => [c.id,c]));
@@ -202,6 +292,24 @@ function funnelHTML(data) {
   if (!stages.length) return '';
   return '<div class="funnel"><strong class="meta">Как сузился выбор</strong><ol>' + stages.map(s =>
     `<li><b>${esc(s.count)}</b> ${esc(STEP_LABELS[s.step] || s.step)}</li>`).join('') + '</ol></div>';
+}
+function hintAction(hint, request) {
+  const day = /ближайший свободный день\s*[—–-]\s*(\d{1,2})\s+([а-яё]+)/i.exec(hint);
+  if (day && MONTHS[day[2].toLowerCase()]) {
+    const date = `${request.date.slice(0,4)}-${String(MONTHS[day[2].toLowerCase()]).padStart(2,'0')}-${day[1].padStart(2,'0')}`;
+    if ((!field('date').min || date >= field('date').min) && (!field('date').max || date <= field('date').max)) return {name:'date',value:date};
+  }
+  const budget = /при бюджете от\s+([\d\s\u00a0\u202f]+)\s*₸/i.exec(hint);
+  if (budget) {
+    const value = Number(budget[1].replace(/\D/g,''));
+    if (Number.isSafeInteger(value) && value > 0) return {name:'budget',value:String(value)};
+  }
+  return null;
+}
+function hintHTML(hint, request) {
+  const action = hintAction(String(hint),request);
+  return action ? `<div class="hint"><button type="button" class="hint-action" data-hint-field="${action.name}" data-hint-value="${esc(action.value)}">→ ${esc(hint)} <span>Применить</span></button></div>`
+    : `<div class="hint">→ ${esc(hint)}</div>`;
 }
 function cardHTML(c, index, changed, otherDate) {
   const source = c.explanation_source === 'llm' ? 'AI-объяснение' : c.explanation_source === 'template' ? 'Объяснение по данным' : '';
@@ -214,15 +322,15 @@ function cardHTML(c, index, changed, otherDate) {
     ${changed ? `<p class="change-note">На ${esc(dateLabel(otherDate))} занят — не попал в другую подборку.</p>` : ''}
   </article>`;
 }
-function resultHTML(data, request, other, otherRequest) {
+function resultHTML(data, request, other, otherRequest, side) {
   const [kind,title] = OUTCOMES[data.outcome] || ['invalid_request','Неизвестный результат'];
   const lost = new Set(other ? busyChanges(data,other).map(c => c.id) : []);
   const arrivedBusy = new Set(other ? busyChanges(other,data).map(c => c.id) : []);
   const excluded = list(data.excluded);
-  return `<section class="result" aria-label="Подборка на ${esc(dateLabel(request.date))}">
+  return `<section class="result" data-side="${side}" aria-label="Подборка на ${esc(dateLabel(request.date))}">
     <div class="result-head"><h2>Подборка на ${esc(dateLabel(request.date))}</h2><span class="badge">${list(data.cards).length} из 3</span></div>
     <p class="meta">${esc(request.city)} · ${esc(request.category)} · ${esc(request.event_type)} · до ${esc(money(request.budget))}${request.duration ? ` · ${esc(request.duration)} ч` : ''}${request.language ? ` · ${esc(request.language)}` : ''}</p>
-    <div class="outcome ${kind}"><h3>${title}</h3><div>${esc(data.message)}</div>${list(data.hints).map(h => `<div class="hint">→ ${esc(h)}</div>`).join('')}</div>
+    <div class="outcome ${kind}"><h3>${title}</h3><div>${esc(data.message)}</div>${list(data.hints).map(h => hintHTML(h,request)).join('')}</div>
     ${funnelHTML(data)}
     <div class="cards">${list(data.cards).map((c,i) => cardHTML(c,i,lost.has(c.id),otherRequest?.date)).join('')}</div>
     ${excluded.length ? `<details${arrivedBusy.size ? ' open' : ''}><summary>Не попали — почему (${excluded.length})</summary><ul class="excluded">${excluded.map(c =>
@@ -240,8 +348,8 @@ async function run(request, secondDate = null) {
     const results = await Promise.all(secondRequest ? [send(request),send(secondRequest)] : [send(request)]);
     if (current !== generation) return;
     if (results.some(d => !d || !Array.isArray(d.cards) || !d.outcome)) throw new Error('Ответ сервера не содержит результатов подбора.');
-    lastRequest = {...request}; out.className = secondDate ? 'results comparing' : 'results';
-    out.innerHTML = resultHTML(results[0],request,results[1],secondRequest) + (secondRequest ? resultHTML(results[1],secondRequest,results[0],request) : '');
+    lastRequest = {...request}; renderedRequests = secondRequest ? [request,secondRequest] : [request]; out.className = secondDate ? 'results comparing' : 'results';
+    out.innerHTML = resultHTML(results[0],request,results[1],secondRequest,0) + (secondRequest ? resultHTML(results[1],secondRequest,results[0],request,1) : '');
     if (secondRequest) {
       const lost = busyChanges(results[0],results[1]);
       note(lost.length ? `На ${dateLabel(secondDate)} из первой подборки заняты: ${lost.map(c => c.name).join(', ')}. Они подсвечены.` : 'Сравнение готово. Среди первой подборки нет подтверждённых исключений из-за занятости на вторую дату.');
@@ -254,15 +362,31 @@ async function run(request, secondDate = null) {
     if (current === generation) { pending = false; active = null; buttons(); out.setAttribute('aria-busy','false'); }
   }
 }
-f.addEventListener('input', () => {
+f.addEventListener('input', event => {
+  if (parsing) { parsedGeneration++; parseActive?.abort(); parseActive = null; parsing = false; nlResult.textContent = 'Форма изменена вручную. Чтобы использовать описание, нажмите «Разобрать» ещё раз.'; buttons(); }
   field('budget').setCustomValidity(''); field('duration').setCustomValidity('');
-  if (lastRequest || pending) {
-    generation++; active?.abort(); active = null; pending = false; lastRequest = null;
-    out.className = 'results'; out.innerHTML = ''; out.setAttribute('aria-busy','false');
-    note('Условия изменились. Нажмите «Подобрать подрядчиков», чтобы обновить результат.'); buttons();
-  }
+  if (event.target.value) { event.target.classList.remove('missing-field'); event.target.removeAttribute('aria-invalid'); }
+  invalidateResults();
 });
 f.addEventListener('submit', event => { event.preventDefault(); const request = readRequest(); if (request) run(request); });
+parseButton.addEventListener('click',parseText);
+nlText.addEventListener('keydown',event => { if (event.key === 'Enter' && event.ctrlKey) { event.preventDefault(); parseText(); } });
+nlText.addEventListener('input',() => {
+  if (!parsing) return;
+  parsedGeneration++; parseActive?.abort(); parseActive = null; parsing = false; nlResult.textContent = 'Описание изменилось. Нажмите «Разобрать» ещё раз.'; buttons();
+});
+out.addEventListener('click',event => {
+  const action = event.target.closest('.hint-action');
+  if (!action || !out.contains(action)) return;
+  const base = renderedRequests[Number(action.closest('.result')?.dataset.side)];
+  if (!base || !['date','budget'].includes(action.dataset.hintField)) return;
+  const request = {...base,[action.dataset.hintField]:action.dataset.hintField === 'budget' ? Number(action.dataset.hintValue) : action.dataset.hintValue};
+  clearMissing();
+  for (const name of Object.keys(FIELD_LABELS)) field(name).value = request[name] == null ? '' : String(request[name]);
+  invalidateResults('');
+  const valid = readRequest();
+  if (valid) run(valid);
+});
 compareDate.addEventListener('input', () => compareDate.setCustomValidity(''));
 compare.addEventListener('click', () => {
   if (!lastRequest || pending) return;
