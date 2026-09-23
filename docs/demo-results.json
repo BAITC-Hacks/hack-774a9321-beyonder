@@ -62,7 +62,7 @@
           "source": "organizers",
           "price_imputed": false,
           "city_imputed": false,
-          "score": 0.521702,
+          "score": 0.521704,
           "score_parts": {
             "budget": 0.562,
             "relevance": 0.35,
@@ -98,7 +98,7 @@
           "source": "organizers",
           "price_imputed": true,
           "city_imputed": false,
-          "score": 0.48087,
+          "score": 0.480886,
           "score_parts": {
             "budget": 0.625,
             "relevance": 0.214,
@@ -134,7 +134,7 @@
           "source": "organizers",
           "price_imputed": false,
           "city_imputed": false,
-          "score": 0.385503,
+          "score": 0.385482,
           "score_parts": {
             "budget": 0.25,
             "relevance": 0.313,
@@ -260,11 +260,11 @@
           "source": "organizers",
           "price_imputed": true,
           "city_imputed": false,
-          "score": 0.574125,
+          "score": 0.574187,
           "score_parts": {
             "budget": 0.75,
-            "relevance": 0.219,
-            "semantic": 0.219,
+            "relevance": 0.22,
+            "semantic": 0.22,
             "hours": 1.0,
             "language": 0.333,
             "data_quality": 0.5
@@ -515,7 +515,7 @@
           "source": "organizers",
           "price_imputed": false,
           "city_imputed": false,
-          "score": 0.553741,
+          "score": 0.553729,
           "score_parts": {
             "budget": 0.75,
             "relevance": 0.318,
@@ -733,16 +733,16 @@
             "source": "organizers",
             "price_imputed": false,
             "city_imputed": false,
-            "score": 0.333535,
+            "score": 0.338725,
             "score_parts": {
               "budget": 0.188,
-              "relevance": 0.334,
-              "semantic": 0.334,
+              "relevance": 0.351,
+              "semantic": 0.351,
               "hours": 0.5,
               "language": 0.333,
               "data_quality": 1.0
             },
-            "explanation": "В описании — «• Разработанный ТОЛЬКО для Вас сценарий • Импровизация». Цена от 650 000 ₸ — 81% бюджета.",
+            "explanation": "В описании — «Динамичный праздник без шаблонов и банальностей». Цена от 650 000 ₸ — 81% бюджета.",
             "explanation_source": "template",
             "highlights": [
               "Единственный подходящий профиль"
