@@ -113,7 +113,9 @@ def _first_by_position(text: str, table: dict[str, list[str]],
                     best = m
                 break
         if best:
-            hits.append((best.start(), rank, best.end(), value, best.group(0)))
+            # Паттерны — корни слов («астан», «свадьб»); пользователю показываем слово целиком.
+            end = best.end() + re.match(r"\w*", text[best.end():]).end()
+            hits.append((best.start(), rank, end, value, text[best.start():end]))
     hits.sort()
     taken: list[tuple[int, int]] = []
     out = []
