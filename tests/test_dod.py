@@ -47,6 +47,7 @@ def test_determinism_and_card_contract(req, catalog):
     assert all(c["explanation_source"] == "template" for c in first["cards"])
     assert all(isinstance(c["highlights"], list) and c["highlights"]
                for c in first["cards"])
+    assert len({tuple(c["highlights"]) for c in first["cards"]}) == len(first["cards"])
 
 
 def test_busy_contractors_never_shown(req, catalog):
@@ -185,7 +186,8 @@ def test_shared_venue_hours_move_to_message_and_capacity_leads(catalog):
                for card in result["cards"])
     capacity = next(card for card in result["cards"] if card["id"] == "HK-90011")
     assert "200 гостей" in capacity["explanation"].split(". Цена от ", 1)[0]
-    assert "200 гостей" in capacity["highlights"][0]
+    assert "Дороже ближайшего на 200 000 ₸" in capacity["highlights"]
+    assert len({tuple(c["highlights"]) for c in result["cards"]}) == 2
     assert all("8 ч" not in item for card in result["cards"] for item in card["highlights"])
 
 
@@ -208,8 +210,30 @@ def test_run_on_host_bio_provides_specific_quote(catalog):
     result = match(req, catalog)
     host = next(card for card in result["cards"] if card["id"] == "HK-26808")
     assert "Сценарист команды КВН Высшей лиги" in host["explanation"]
-    assert "Сценарист команды КВН Высшей лиги" in host["highlights"][0]
+    assert any("дешевле" in highlight.lower() for highlight in host["highlights"])
+    assert len({tuple(c["highlights"]) for c in result["cards"]}) == len(result["cards"])
     assert "казахский, русский" in result["message"]
+
+
+def test_highlights_are_short_comparisons_and_distinct_for_ties(catalog):
+    req = MatchRequest("Алматы", date(2026, 10, 10), "свадьба", "Банкетный зал", 5_000_000)
+    cards = match(req, catalog)["cards"]
+    assert all(1 <= len(c["highlights"]) <= 3 for c in cards)
+    assert all(len(item) <= 80 and "Из описания" not in item and "Цена от" not in item
+               for c in cards for item in c["highlights"])
+    assert "Единственный с казахским" in next(
+        c for c in cards if c["id"] == "HK-58236"
+    )["highlights"]
+    assert all("той" not in item for c in cards for item in c["highlights"])
+    assert len({tuple(c["highlights"]) for c in cards}) == len(cards)
+
+    original = next(c for c in catalog if c.id == "HK-90011")
+    same = replace(original, id="HK-DUP", name="Другой профиль")
+    tied = match(req, [replace(original, busy=frozenset()),
+                       replace(same, busy=frozenset())])["cards"]
+    assert len(tied) == 2
+    assert len({tuple(c["highlights"]) for c in tied}) == 2
+    assert all(any("Позиция" in item for item in c["highlights"]) for c in tied)
 
 
 @pytest.mark.parametrize(("profile_id", "category", "detail"), [

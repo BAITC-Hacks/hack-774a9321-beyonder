@@ -148,7 +148,7 @@ def _comparisons(cand: Candidate, shown: list[Candidate]) -> list[str]:
     c = cand.c
     others = [o for o in shown if o is not cand]
     if not others:
-        return []
+        return ["единственный подходящий профиль"]
     facts = []
     other_languages = set().union(*(o.c.languages for o in others))
     for language in sorted(c.languages - other_languages):
@@ -288,26 +288,29 @@ def _explain(cand: Candidate, req: MatchRequest, facts: dict,
     return f"{first} {second}"
 
 
-def _highlights(cand: Candidate, req: MatchRequest, facts: dict,
-                common_max_hours: int | None) -> list[str]:
-    """Короткие проверяемые факты карточки, без условий, общих для всей выдачи."""
-    items = []
-    if facts["description_quote"]:
-        items.append(f"Из описания: «{facts['description_quote']}»")
-    if cand.c.max_hours is not None and cand.c.max_hours != common_max_hours:
-        hours = f"До {cand.c.max_hours} ч на площадке"
-        if req.duration:
-            hours += f" при запросе {req.duration} ч"
-        items.append(hours)
-    language = next((part for part in facts["comparisons"]
-                     if part.startswith("единственный в подборке работает")), None)
-    if language:
-        items.append(language.capitalize())
-    price = f"Цена от {fmt_kzt(cand.c.price)}"
-    if cand.c.price_imputed:
-        price += " (оценочная)"
-    items.append(price)
-    return items[:3]
+def _highlights(comparisons: list[str]) -> list[str]:
+    """Превратить проверенные сравнения в короткие различимые UI-метки."""
+    items, formats = [], []
+    for part in comparisons:
+        price = re.fullmatch(r"на (.+ ₸) (дешевле|дороже) (.+)", part)
+        hours = re.fullmatch(r"до (\d+) ч на площадке, у остальных — не более \d+ ч", part)
+        language = re.fullmatch(r"единственный в подборке работает на (.+)", part)
+        event_format = re.fullmatch(r"единственный в подборке также берёт формат «(.+)»", part)
+        if price:
+            items.append(f"{price[2].capitalize()} {price[3]} на {price[1]}")
+        elif hours:
+            items.append(f"До {hours[1]} ч — дольше остальных")
+        elif language:
+            instrumental = {"казахском": "казахским", "русском": "русским",
+                            "английском": "английским"}.get(language[1], language[1])
+            items.append(f"Единственный с {instrumental}")
+        elif part == "единственный в подборке без привязки к часам присутствия на площадке":
+            items.append("Только здесь лимит часов не указан")
+        elif event_format:
+            formats.append(f"Единственный также берёт «{event_format[1]}»")
+        else:
+            items.append(part.capitalize())
+    return (items if items else formats)[:3]
 
 
 def _card(cand: Candidate, explanation: str, highlights: list[str]) -> dict:
@@ -430,8 +433,15 @@ def match(req: MatchRequest, catalog: list[Contractor]) -> dict:
             shared_quote = quotes[0]
             for fact in facts.values():
                 fact["description_quote"] = None
+    highlights = [_highlights(facts[p.c.id]["comparisons"]) for p in shown]
+    signatures = [tuple(items) for items in highlights]
+    for index, p in enumerate(shown):
+        if len(shown) > 1 and (not highlights[index] or signatures.count(signatures[index]) > 1):
+            fallback = f"Позиция {index + 1} из {len(shown)} в подборке"
+            facts[p.c.id]["comparisons"].append(fallback)
+            highlights[index] = [*highlights[index][:2], fallback]
     cards = [_card(p, _explain(p, req, facts[p.c.id], common_max_hours),
-                   _highlights(p, req, facts[p.c.id], common_max_hours)) for p in shown]
+                   highlights[index]) for index, p in enumerate(shown)]
     # Не выдумываем различия между полностью совпадающими профилями.
     texts = [card["explanation"] for card in cards]
     for card in cards:
