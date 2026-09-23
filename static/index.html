@@ -146,7 +146,7 @@
   <header><div class="brand">beyonder<span>↗</span></div><div class="eyebrow">Событие начинается с людей</div></header>
   <section class="hero" aria-labelledby="title">
     <div class="eyebrow">Умный подбор подрядчиков</div>
-    <h1>Ваше событие.<br>Три подходящих варианта.</h1>
+    <h1>Ваше событие.<br>До трёх подходящих вариантов.</h1>
     <p class="muted">Укажите условия — мы проверим доступность и бюджет, а затем объясним, почему подходит каждый подрядчик.</p>
   </section>
   <section class="panel" aria-label="Условия подбора">
@@ -184,10 +184,10 @@
   <section class="compare-bar" aria-label="Сравнение дат">
     <label>Другая дата <input id="compare-date" type="date" required></label>
     <button id="compare" class="secondary" type="button" disabled>Сравнить с другой датой</button>
-    <p class="meta">Сначала подберите подрядчиков. При сравнении изменится только дата — остальные условия останутся теми же.</p>
+    <p class="meta" id="compare-help">Сначала подберите подрядчиков. При сравнении изменится только дата — остальные условия останутся теми же.</p>
   </section>
   <div id="status" role="status" aria-live="polite"></div>
-  <div id="out" class="results" aria-live="polite" aria-busy="false">
+  <div id="out" class="results" aria-busy="false">
     <p class="empty">Заполните условия, чтобы увидеть подборку и причины выбора.</p>
   </div>
   <footer>Демонстрационный каталог HackAlem AI · Анонимизированные данные.<br>Подбор не является бронированием. Цены указаны «от»; доступность и итоговую стоимость нужно подтвердить у подрядчика.</footer>
@@ -210,10 +210,11 @@ const EXAMPLES = {
   'no-city': {city:'Астана',date:'2026-10-10',event_type:'свадьба',category:'Лайв-бэнд',budget:800000},
   compare: {city:'Алматы',date:'2026-10-10',event_type:'свадьба',category:'Фотограф',budget:800000,secondDate:'2026-12-12'}
 };
-const SCORE_PARTS = {budget:['Бюджет','40%'],relevance:['Описание и формат','30%'],hours:['Часы','15%'],language:['Язык','10%'],data_quality:['Качество данных','5%']};
+const SCORE_PARTS = {budget:['Бюджет','40%'],relevance:['Описание и формат','30%'],semantic:['Смысл описания'],hours:['Часы','15%'],language:['Язык','10%'],data_quality:['Качество данных','5%']};
 const f = document.getElementById('f'), out = document.getElementById('out');
 const status = document.getElementById('status'), submit = document.getElementById('submit');
 const compare = document.getElementById('compare'), compareDate = document.getElementById('compare-date');
+const compareHelp = document.getElementById('compare-help');
 const retryMeta = document.getElementById('retry-meta'), catalogNote = document.getElementById('catalog-note');
 const nlText = document.getElementById('nl-text'), parseButton = document.getElementById('parse');
 const nlResult = document.getElementById('nl-result');
@@ -237,6 +238,9 @@ function cancelPlanB() { for (const controller of planBControllers) controller.a
 function buttons() {
   submit.disabled = !ready || pending || parsing;
   compare.disabled = !ready || pending || parsing || !lastRequest;
+  compareHelp.textContent = lastRequest
+    ? 'При сравнении изменится только дата — остальные условия останутся теми же.'
+    : 'Сначала подберите подрядчиков. При сравнении изменится только дата — остальные условия останутся теми же.';
   parseButton.disabled = !ready || parsing;
   exampleList.querySelectorAll('button[data-example]').forEach(button => { button.disabled = !ready || pending || parsing; });
 }
@@ -455,13 +459,15 @@ function scoreHTML(c) {
   const keys = [...Object.keys(SCORE_PARTS).filter(key => Object.hasOwn(parts,key)), ...Object.keys(parts).filter(key => !Object.hasOwn(SCORE_PARTS,key))]
     .filter(key => numeric(parts[key]));
   if (!keys.length) return '';
+  const legacyWeights = Object.keys(parts).length === 5 &&
+    ['budget','relevance','hours','language','data_quality'].every(key => numeric(parts[key]));
   const total = numeric(c.score) ? `<p class="score-total">Итог: ${(c.score*100).toLocaleString('ru-RU',{maximumFractionDigits:1})} из 100</p>` : '';
   return `<details class="score-details"><summary>Как посчитан рейтинг</summary>${total}<div class="score-list">${keys.map(key => {
     const value = Math.max(0,Math.min(100,Math.round(parts[key]*100)));
-    const label = SCORE_PARTS[key]?.[0] || key;
-    const weight = SCORE_PARTS[key]?.[1];
+    const label = SCORE_PARTS[key]?.[0] || `Дополнительный фактор (${key})`;
+    const weight = legacyWeights ? SCORE_PARTS[key]?.[1] : null;
     return `<div class="score-row"><div class="score-row-head"><span>${esc(label)}${weight ? ` · вес ${weight}` : ''}</span><span>${value} из 100</span></div><div class="score-track" aria-hidden="true"><span style="width:${value}%"></span></div></div>`;
-  }).join('')}</div><p class="score-note">Взвешенная сумма, не вероятность; при равенстве — по id.</p></details>`;
+  }).join('')}</div><p class="score-note">Оценки факторов показаны до учёта весов; итог учитывает веса и не является вероятностью. При равенстве — по id.</p></details>`;
 }
 function cardHTML(c, index, cards, request, changed, otherDate) {
   const source = c.explanation_source === 'llm' ? 'AI-объяснение' : c.explanation_source === 'template' ? 'Объяснение по данным' : '';
@@ -485,7 +491,7 @@ function resultHTML(data, request, other, otherRequest, side, elapsedMs) {
   const cards = list(data.cards);
   const zeroCategoryFunnel = kind === 'no_category_in_city' && list(data.funnel).every(step => Number(step?.count) === 0);
   return `<section class="result" data-side="${side}" aria-label="Подборка на ${esc(dateLabel(request.date))}">
-    <div class="result-head"><h2>Подборка на ${esc(dateLabel(request.date))}</h2><div class="result-measure"><span class="response-time">ответ за ${responseTime(elapsedMs)}</span><span class="badge">${cards.length} из 3</span></div></div>
+    <div class="result-head"><h2 tabindex="-1">Подборка на ${esc(dateLabel(request.date))}</h2><div class="result-measure"><span class="response-time">ответ за ${responseTime(elapsedMs)}</span><span class="badge">${cards.length} из 3</span></div></div>
     <p class="meta">${esc(request.city)} · ${esc(request.category)} · ${esc(request.event_type)} · до ${esc(money(request.budget))}${request.duration ? ` · ${esc(request.duration)} ч` : ''}${request.language ? ` · ${esc(request.language)}` : ''}</p>
     <div class="outcome ${kind}"><h3>${title}</h3><div>${esc(data.message)}</div>${list(data.hints).map(h => hintHTML(h,request)).join('')}</div>
     ${kind === 'partial' || kind === 'none_match' ? `<section class="plan-b" data-plan-b aria-labelledby="plan-b-title-${side}"><div class="eyebrow">План Б · те же условия</div><h3 id="plan-b-title-${side}">Другие даты</h3><div data-plan-b-body>${planBLoadingHTML()}</div></section>` : ''}
@@ -495,7 +501,7 @@ function resultHTML(data, request, other, otherRequest, side, elapsedMs) {
       `<li${arrivedBusy.has(c.id) ? ' class="busy-change"' : ''}><strong>${esc(c.name)}</strong> ${synthetic(c)}<p>${esc(list(c.reasons).join('; '))}</p>${arrivedBusy.has(c.id) ? '<span class="change-note">Был в подборке на другую дату; сейчас занят</span>' : ''}</li>`).join('')}</ul></details>` : ''}
   </section>`;
 }
-async function run(request, secondDate = null) {
+async function run(request, secondDate = null, focusResult = false) {
   const current = ++generation;
   active?.abort(); cancelPlanB(); const controller = new AbortController(); active = controller;
   const timeout = setTimeout(() => controller.abort(),45000);
@@ -522,7 +528,8 @@ async function run(request, secondDate = null) {
     if (secondRequest) {
       const lost = busyChanges(results[0],results[1]);
       note(lost.length ? `На ${dateLabel(secondDate)} из первой подборки заняты: ${lost.map(c => c.name).join(', ')}. Они подсвечены.` : 'Сравнение готово. Среди первой подборки нет подтверждённых исключений из-за занятости на вторую дату.');
-    } else note('');
+    } else note(`Подбор завершён. Подходящих подрядчиков: ${results[0].cards.length} из 3.`);
+    if (focusResult) out.querySelector('.result h2')?.focus();
   } catch (error) {
     if (current !== generation) return;
     out.innerHTML = '<p class="empty">Результат пока недоступен. Повторите запрос.</p>';
@@ -552,7 +559,7 @@ exampleList.addEventListener('click', event => {
   field('budget').setCustomValidity(''); field('duration').setCustomValidity('');
   if (example.secondDate) { compareDate.value = example.secondDate; compareDate.setCustomValidity(''); }
   const request = readRequest();
-  if (request) run(request,example.secondDate || null);
+  if (request) run(request,example.secondDate || null,true);
 });
 parseButton.addEventListener('click',parseText);
 nlText.addEventListener('keydown',event => { if (event.key === 'Enter' && event.ctrlKey) { event.preventDefault(); parseText(); } });
@@ -568,7 +575,7 @@ function applySuggestedRequest(request) {
   if (parsedSummaryCurrent) { parsedSummaryCurrent = false; nlResult.textContent = 'Условия изменены по подсказке. Проверьте дату и бюджет в форме.'; }
   invalidateResults('');
   const valid = readRequest();
-  if (valid) run(valid);
+  if (valid) run(valid,null,true);
 }
 out.addEventListener('click',event => {
   const dateOption = event.target.closest('[data-plan-b-date]');
