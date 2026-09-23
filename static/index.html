@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Beyonder — подбор подрядчиков</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 960px; margin: 0 auto; padding: 16px; background: #f7f5f2; color: #1f1b16; }
+  h1 { font-size: 20px; }
+  form { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; background: #fff; padding: 14px; border-radius: 10px; border: 1px solid #e7e1d8; }
+  label { display: flex; flex-direction: column; font-size: 12px; color: #7a7268; gap: 4px; }
+  input, select, button { font: inherit; padding: 6px 8px; border: 1px solid #d8d0c4; border-radius: 6px; }
+  button { background: #3f6fb3; color: #fff; border: 0; cursor: pointer; align-self: end; }
+  .msg { margin: 16px 0 8px; padding: 12px; border-radius: 8px; background: #fff; border-left: 4px solid #3f6fb3; }
+  .msg.none_match, .msg.no_category_in_city, .msg.invalid_request { border-left-color: #c0392b; }
+  .msg.partial { border-left-color: #d68910; }
+  .outcome { font-weight: 600; }
+  .cards { display: grid; gap: 12px; }
+  .card { background: #fff; border: 1px solid #e7e1d8; border-radius: 10px; padding: 14px; }
+  .card h3 { margin: 0 0 4px; font-size: 16px; }
+  .meta { font-size: 12px; color: #7a7268; }
+  .badge { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 999px; margin-left: 6px; background: #fdebd0; color: #7e5109; }
+  .expl { margin-top: 8px; }
+  details { margin-top: 12px; font-size: 13px; }
+  .hint { font-size: 13px; margin: 4px 0; }
+</style>
+</head>
+<body>
+<h1>Подбор event-подрядчиков</h1>
+<form id="f">
+  <label>Город <select name="city"></select></label>
+  <label>Дата <input type="date" name="date" required></label>
+  <label>Тип мероприятия <select name="event_type"></select></label>
+  <label>Категория <select name="category"></select></label>
+  <label>Бюджет, ₸ <input type="number" name="budget" min="1" step="10000" value="800000" required></label>
+  <label>Длительность, ч <input type="number" name="duration" min="1" max="24" placeholder="необязательно"></label>
+  <label>Язык <select name="language"><option value="">любой</option></select></label>
+  <button type="submit">Подобрать</button>
+</form>
+<div id="out"></div>
+<script>
+const OUTCOME = {
+  found: "Подобрали",
+  partial: "Подходящих меньше трёх",
+  no_category_in_city: "В этом городе такой категории нет",
+  none_match: "Кандидаты есть, но ни один не проходит по условиям",
+  invalid_request: "Запрос вне календаря",
+};
+const f = document.getElementById("f"), out = document.getElementById("out");
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const kzt = v => v.toLocaleString("ru-RU") + " ₸";
+
+fetch("/api/meta").then(r => r.json()).then(m => {
+  const fill = (name, items) => items.forEach(v => f[name].add(new Option(v, v)));
+  fill("city", m.cities); fill("event_type", m.event_types); fill("category", m.categories); fill("language", m.languages);
+  f.date.min = m.date_min; f.date.max = m.date_max; f.date.value = "2026-10-10";
+});
+
+f.addEventListener("submit", async e => {
+  e.preventDefault();
+  const fd = Object.fromEntries(new FormData(f));
+  const body = { city: fd.city, date: fd.date, event_type: fd.event_type, category: fd.category,
+                 budget: Number(fd.budget), duration: fd.duration ? Number(fd.duration) : null, language: fd.language || null };
+  out.innerHTML = "<p>Подбираем…</p>";
+  const r = await fetch("/api/match", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const d = await r.json();
+  if (!r.ok) { out.innerHTML = `<div class="msg none_match">${esc(d.detail?.[0]?.msg || d.detail || "Ошибка запроса")}</div>`; return; }
+  let html = `<div class="msg ${d.outcome}"><div class="outcome">${OUTCOME[d.outcome]}</div>${esc(d.message)}` +
+             d.hints.map(h => `<div class="hint">→ ${esc(h)}</div>`).join("") + `</div>`;
+  html += `<div class="cards">` + d.cards.map(c => `
+    <div class="card">
+      <h3>${esc(c.name)}${c.synthetic ? '<span class="badge">синтетический профиль</span>' : ""}</h3>
+      <div class="meta">${esc(c.categories.join(", "))} · ${esc(c.city)} · от ${kzt(c.price_from_kzt)}</div>
+      <div class="expl">${esc(c.explanation)}</div>
+    </div>`).join("") + `</div>`;
+  if (d.excluded.length) {
+    html += `<details><summary>Не попали в выдачу (${d.excluded.length}) — почему</summary><ul>` +
+      d.excluded.map(x => `<li><b>${esc(x.name)}</b>${x.synthetic ? " (синт.)" : ""}: ${esc(x.reasons.join("; "))}</li>`).join("") +
+      `</ul></details>`;
+  }
+  out.innerHTML = html;
+});
+</script>
+</body>
+</html>

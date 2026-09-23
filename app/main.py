@@ -1,0 +1,58 @@
+"""HTTP API и отдача веб-страницы."""
+from __future__ import annotations
+
+from datetime import date
+from pathlib import Path
+
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
+from pydantic import BaseModel, Field
+
+from .data import CALENDAR_END, CALENDAR_START, load_catalog
+from .matcher import MatchRequest, match
+
+STATIC = Path(__file__).resolve().parent.parent / "static"
+
+app = FastAPI(title="Beyonder — умный подбор подрядчиков")
+CATALOG = load_catalog()
+
+
+class MatchIn(BaseModel):
+    city: str
+    date: date
+    event_type: str
+    category: str
+    budget: int = Field(gt=0)
+    duration: int | None = Field(default=None, gt=0)
+    language: str | None = None
+
+
+@app.get("/api/meta")
+def meta() -> dict:
+    return {
+        "cities": sorted({c.city for c in CATALOG}),
+        "categories": sorted({k for c in CATALOG for k in c.categories}),
+        "event_types": sorted({f for c in CATALOG for f in c.formats}),
+        "languages": sorted({l for c in CATALOG for l in c.languages}),
+        "date_min": CALENDAR_START.isoformat(),
+        "date_max": CALENDAR_END.isoformat(),
+        "profiles": len(CATALOG),
+        "synthetic_profiles": sum(c.synthetic for c in CATALOG),
+    }
+
+
+@app.post("/api/match")
+def api_match(body: MatchIn) -> dict:
+    known = meta()
+    if body.event_type not in known["event_types"]:
+        raise HTTPException(422, f"Неизвестный тип мероприятия: {body.event_type}")
+    if body.language and body.language not in known["languages"]:
+        raise HTTPException(422, f"Неизвестный язык: {body.language}")
+    req = MatchRequest(city=body.city, date=body.date, event_type=body.event_type, category=body.category,
+                       budget=body.budget, duration=body.duration, language=body.language or None)
+    return match(req, CATALOG)
+
+
+@app.get("/")
+def index() -> FileResponse:
+    return FileResponse(STATIC / "index.html")
