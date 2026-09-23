@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 
 from .data import CALENDAR_END, CALENDAR_START, Contractor
+from . import explain_llm
 
 MAX_CARDS = 3
 FILTER_ORDER = ("busy", "budget", "format", "language", "duration")
@@ -165,7 +166,8 @@ def _comparisons(cand: Candidate, shown: list[Candidate]) -> list[str]:
 
 def _description_quote(cand: Candidate, req: MatchRequest, shown: list[Candidate]) -> str | None:
     """Отличающийся фрагмент описания; приоритет у совпадения с форматом."""
-    sentences = [s for s in _sentences(cand.c.description) if _marker_hits(s, req.event_type)]
+    sentences = [s for s in _sentences(cand.c.description)
+                 if _marker_hits(s, req.event_type) and not explain_llm.has_generic_phrase(s)]
     others = [o.c.description.casefold() for o in shown if o is not cand]
     sentences = sorted(enumerate(sentences), key=lambda pair: (
         -int(all(pair[1].casefold() not in desc for desc in others)),
@@ -322,6 +324,13 @@ def match(req: MatchRequest, catalog: list[Contractor]) -> dict:
     for card in cards:
         if texts.count(card["explanation"]) > 1:
             card["explanation"] = f"Профиль {card['id']}: " + card["explanation"]
+    rewritten = explain_llm.rewrite(cards, req, {
+        "facts_by_id": facts, "pool_size": len(pool), "busy_in_pool": busy_in_pool,
+    })
+    if rewritten is not None:
+        for card, explanation in zip(cards, rewritten):
+            card["explanation"] = explanation
+            card["explanation_source"] = "llm"
     excluded = [{"id": f.c.id, "name": f.c.name, "synthetic": f.c.synthetic,
                  "reasons": [t for _, t in f.fails]} for f in sorted(failed, key=lambda x: x.c.id)]
 
