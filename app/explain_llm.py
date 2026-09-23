@@ -282,7 +282,20 @@ async def _bounded_generate(*args, remaining: float):
     return await asyncio.wait_for(_generate(*args), timeout=remaining)
 
 
+def _group_thousands(text: str) -> str:
+    """«350000 ₸» → «350 000 ₸», как в шаблонах. Цитаты «…» не трогаем — они дословные."""
+    parts = re.split(r"(«[^»]*»)", text)
+    money = re.compile(r"(?<![\d.,])(\d{4,})(?=\s*₸)")
+    return "".join(p if p.startswith("«") else money.sub(lambda m: f"{int(m[1]):,}".replace(",", " "), p)
+                   for p in parts)
+
+
 def rewrite(cards: list[dict], req, context: dict) -> list[str] | None:
+    texts = _rewrite(cards, req, context)
+    return [_group_thousands(t) for t in texts] if texts is not None else None
+
+
+def _rewrite(cards: list[dict], req, context: dict) -> list[str] | None:
     """Sync API для match(): context содержит facts_by_id, pool_size, busy_in_pool.
 
     Рейтинг не изменяется. Отказы тоже кэшируются, чтобы повторный запрос не менял

@@ -410,3 +410,9 @@ def test_nvidia_sdk_sends_compatible_chat_request(bundle, monkeypatch):
     assert body["model"] == "test-model"
     assert body["temperature"] == 0 and body["max_tokens"] == 1200
     assert "response_format" not in body
+
+
+def test_prices_in_llm_text_get_thousand_separators_but_quotes_stay_verbatim():
+    text = "В описании — «с 2015 года, 1200 гостей». Цена от 350000 ₸; на 50 000 ₸ дешевле, от 2500000₸."
+    assert llm._group_thousands(text) == (
+        "В описании — «с 2015 года, 1200 гостей». Цена от 350 000 ₸; на 50 000 ₸ дешевле, от 2 500 000₸.")
