@@ -309,3 +309,32 @@ def test_real_sdk_serializes_batch_against_mock_transport(bundle, monkeypatch):
     schema = requests[0]["response_format"]["json_schema"]["schema"]
     assert schema["additionalProperties"] is False
     assert schema["properties"]["explanations"]["minItems"] == 3
+
+
+def test_nvidia_sdk_sends_compatible_chat_request(bundle, monkeypatch):
+    real_client = openai.AsyncOpenAI
+    requests = []
+
+    def handler(request):
+        requests.append(request)
+        return httpx.Response(200, json={
+            "id": "chatcmpl-nvidia-local-test", "object": "chat.completion", "created": 0,
+            "model": "test-model", "choices": [{"index": 0, "finish_reason": "stop",
+                "message": {"role": "assistant", "content": bundle.raw}}],
+        })
+
+    def client_factory(**kwargs):
+        return real_client(**kwargs, http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)))
+
+    monkeypatch.setattr(openai, "AsyncOpenAI", client_factory)
+    monkeypatch.setenv("LLM_PROVIDER", "nvidia")
+    monkeypatch.setenv("NVIDIA_API_KEY", "test-only-never-sent")
+    monkeypatch.setenv("NVIDIA_MODEL", "test-model")
+    assert llm.rewrite(bundle.cards, bundle.req, bundle.context) == bundle.texts
+    assert len(requests) == 1
+    assert requests[0].url.host == "integrate.api.nvidia.com"
+    assert requests[0].url.path == "/v1/chat/completions"
+    body = json.loads(requests[0].content)
+    assert body["model"] == "test-model"
+    assert body["temperature"] == 0 and body["max_tokens"] == 1200
+    assert "response_format" not in body
