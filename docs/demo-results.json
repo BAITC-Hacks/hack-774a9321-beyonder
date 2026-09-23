@@ -62,10 +62,11 @@
           "source": "organizers",
           "price_imputed": false,
           "city_imputed": false,
-          "score": 0.626667,
+          "score": 0.521702,
           "score_parts": {
             "budget": 0.562,
-            "relevance": 0.7,
+            "relevance": 0.35,
+            "semantic": 0.35,
             "hours": 0.5,
             "language": 0.667,
             "data_quality": 1.0
@@ -74,42 +75,6 @@
           "explanation_source": "template",
           "highlights": [
             "Дороже самого доступного на 50 000 ₸"
-          ]
-        },
-        {
-          "id": "HK-16628",
-          "name": "Нобара Кугисаки",
-          "categories": [
-            "Фотограф"
-          ],
-          "city": "Алматы",
-          "price_from_kzt": 600000,
-          "languages": [
-            "английский",
-            "русский"
-          ],
-          "max_hours": 12,
-          "event_formats": [
-            "корпоратив",
-            "свадьба"
-          ],
-          "synthetic": false,
-          "source": "organizers",
-          "price_imputed": false,
-          "city_imputed": false,
-          "score": 0.521667,
-          "score_parts": {
-            "budget": 0.25,
-            "relevance": 0.767,
-            "hours": 0.5,
-            "language": 0.667,
-            "data_quality": 1.0
-          },
-          "explanation": "В описании — «Является свадебным и репортажным фотографом». Цена от 600 000 ₸ — 75% бюджета; на 250 000 ₸ дороже ближайшего.",
-          "explanation_source": "template",
-          "highlights": [
-            "Дороже ближайшего на 250 000 ₸",
-            "До 12 ч — дольше остальных"
           ]
         },
         {
@@ -133,10 +98,11 @@
           "source": "organizers",
           "price_imputed": true,
           "city_imputed": false,
-          "score": 0.506667,
+          "score": 0.48087,
           "score_parts": {
             "budget": 0.625,
-            "relevance": 0.3,
+            "relevance": 0.214,
+            "semantic": 0.214,
             "hours": 0.5,
             "language": 0.667,
             "data_quality": 0.5
@@ -145,6 +111,43 @@
           "explanation_source": "template",
           "highlights": [
             "Дешевле ближайшего на 50 000 ₸"
+          ]
+        },
+        {
+          "id": "HK-16628",
+          "name": "Нобара Кугисаки",
+          "categories": [
+            "Фотограф"
+          ],
+          "city": "Алматы",
+          "price_from_kzt": 600000,
+          "languages": [
+            "английский",
+            "русский"
+          ],
+          "max_hours": 12,
+          "event_formats": [
+            "корпоратив",
+            "свадьба"
+          ],
+          "synthetic": false,
+          "source": "organizers",
+          "price_imputed": false,
+          "city_imputed": false,
+          "score": 0.385503,
+          "score_parts": {
+            "budget": 0.25,
+            "relevance": 0.313,
+            "semantic": 0.313,
+            "hours": 0.5,
+            "language": 0.667,
+            "data_quality": 1.0
+          },
+          "explanation": "В описании — «Является свадебным и репортажным фотографом». Цена от 600 000 ₸ — 75% бюджета; на 250 000 ₸ дороже ближайшего.",
+          "explanation_source": "template",
+          "highlights": [
+            "Дороже ближайшего на 250 000 ₸",
+            "До 12 ч — дольше остальных"
           ]
         }
       ],
@@ -257,10 +260,11 @@
           "source": "organizers",
           "price_imputed": true,
           "city_imputed": false,
-          "score": 0.508333,
+          "score": 0.574125,
           "score_parts": {
             "budget": 0.75,
-            "relevance": 0.0,
+            "relevance": 0.219,
+            "semantic": 0.219,
             "hours": 1.0,
             "language": 0.333,
             "data_quality": 0.5
@@ -511,10 +515,11 @@
           "source": "organizers",
           "price_imputed": false,
           "city_imputed": false,
-          "score": 0.688333,
+          "score": 0.553741,
           "score_parts": {
             "budget": 0.75,
-            "relevance": 0.767,
+            "relevance": 0.318,
+            "semantic": 0.318,
             "hours": 0.5,
             "language": 0.333,
             "data_quality": 1.0
@@ -728,15 +733,16 @@
             "source": "organizers",
             "price_imputed": false,
             "city_imputed": false,
-            "score": 0.233333,
+            "score": 0.333535,
             "score_parts": {
               "budget": 0.188,
-              "relevance": 0.0,
+              "relevance": 0.334,
+              "semantic": 0.334,
               "hours": 0.5,
               "language": 0.333,
               "data_quality": 1.0
             },
-            "explanation": "В описании — «Меня зовут Мицури Канроджи – я профессиональный ведущий и сценарист». Цена от 650 000 ₸ — 81% бюджета.",
+            "explanation": "В описании — «• Разработанный ТОЛЬКО для Вас сценарий • Импровизация». Цена от 650 000 ₸ — 81% бюджета.",
             "explanation_source": "template",
             "highlights": [
               "Единственный подходящий профиль"
@@ -883,7 +889,7 @@
           "top": [
             "Рок Ли",
             "Мэгуми Фушигуро",
-            "Нобара Кугисаки"
+            "Альфонс Элрик"
           ]
         }
       ],
