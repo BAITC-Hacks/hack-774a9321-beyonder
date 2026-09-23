@@ -33,7 +33,7 @@
   button:disabled { opacity:.5; cursor:wait; }
   button.secondary { background:#e6eee7; color:var(--ink); border:1px solid #bccfbf; }
   button.secondary:hover:not(:disabled) { background:#d7e6da; }
-  button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible { outline:3px solid #c78313; outline-offset:3px; }
+  button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible { outline:3px solid var(--ink); outline-offset:3px; }
   .nl { margin-bottom:22px; padding-bottom:22px; border-bottom:1px solid var(--line); }
   .nl h2 { margin-bottom:6px; }
   .nl label { margin:12px 0 10px; }
@@ -45,6 +45,11 @@
   .nl-result .note-list { margin-top:9px; color:var(--muted); }
   .missing-field { border-color:#b85126; box-shadow:0 0 0 2px #ffe1ce; }
   .missing-summary { color:#8f3e18; font-weight:650; }
+  .examples { margin:0 0 22px; }
+  .examples .meta { display:block; margin-bottom:9px; }
+  .example-list { display:flex; gap:8px; flex-wrap:wrap; }
+  .example-chip { min-height:38px; border-radius:999px; padding:7px 14px; background:#e8f0e8; border:1px solid #b9cfc0; color:var(--ink); font-size:13px; }
+  .example-chip:hover:not(:disabled) { background:#d6e8d9; }
   .submit { align-self:end; }
   .form-note { margin-top:14px; }
   .compare-bar { margin:18px 0 26px; display:flex; align-items:end; gap:14px; flex-wrap:wrap; }
@@ -57,8 +62,10 @@
   .results { display:grid; gap:22px; }
   .results.comparing { grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start; }
   .result { min-width:0; }
-  .result-head { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:12px; }
+  .result-head { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px; }
   .result-head h2 { margin:0; }
+  .result-measure { display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
+  .response-time { color:var(--muted); font-size:12px; }
   .date-label { font-weight:750; font-size:18px; }
   .outcome { border:1px solid var(--line); border-left:5px solid; border-radius:12px; padding:17px; margin:12px 0; }
   .outcome h3 { font-size:16px; margin-bottom:6px; }
@@ -71,19 +78,36 @@
   .hint-action { display:block; width:100%; min-height:0; padding:8px 10px; text-align:left; font-size:13px; font-weight:500; color:var(--ink); background:#fff; border:1px solid #bdd4c3; }
   .hint-action:hover:not(:disabled) { background:#e4f2e8; }
   .hint-action span { font-weight:750; color:var(--green); text-decoration:underline; }
-  .cards { display:grid; gap:13px; }
-  .card { background:#fff; border:1px solid var(--line); border-radius:14px; padding:20px; overflow-wrap:anywhere; }
+  .cards { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:13px; align-items:stretch; }
+  .results.comparing .cards { grid-template-columns:1fr; }
+  .card { display:flex; flex-direction:column; min-width:0; background:#fff; border:1px solid var(--line); border-radius:14px; padding:20px; overflow-wrap:anywhere; }
   .card-top { display:flex; gap:12px; align-items:start; margin-bottom:10px; }
+  .card-top > div { min-width:0; }
   .rank { display:flex; align-items:center; justify-content:center; flex:0 0 30px; height:30px; border-radius:9px; background:var(--accent); font-weight:750; }
   .price { font-size:19px; font-weight:750; margin:12px 0 8px; }
   .price small { font-size:12px; font-weight:500; }
+  .budget-share { display:inline-block; margin-left:6px; font-size:12px; font-weight:650; color:var(--muted); }
+  .facts { list-style:none; padding:0; margin:4px 0 14px; display:grid; gap:5px; font-size:13px; }
+  .facts li::before { content:'✓'; color:var(--green); font-weight:750; margin-right:7px; }
+  .standout { margin:0 0 14px; padding:10px 12px; border-radius:9px; background:#f1f5e6; font-size:12px; }
+  .standout strong { display:block; margin-bottom:5px; }
+  .standout .tags { margin:0; }
+  .badge.highlight { background:#e1edcc; color:#294b2d; }
   .tags { display:flex; gap:6px; flex-wrap:wrap; }
   .badge { display:inline-block; border-radius:5px; padding:3px 7px; background:#edf2ee; color:#38584a; font-size:11px; font-weight:600; }
   .badge.synthetic { background:#fff0cf; color:#805315; }
   .badge.source { background:#f1eff8; color:#5c4c83; }
-  .why { border-top:1px solid var(--line); margin-top:14px; padding-top:12px; }
+  .why { border-top:1px solid var(--line); margin-top:auto; padding-top:12px; }
   .why strong { display:block; font-size:12px; margin-bottom:5px; }
   .why p { margin:0; font-size:14px; }
+  .score-details { margin-top:14px; padding:12px; background:#fafcf9; }
+  .score-total { margin:10px 0; font-size:13px; font-weight:750; }
+  .score-list { display:grid; gap:9px; }
+  .score-row-head { display:flex; justify-content:space-between; gap:8px; font-size:12px; }
+  .score-row-head span:last-child { white-space:nowrap; }
+  .score-track { height:7px; margin-top:4px; border-radius:999px; background:#dde9df; overflow:hidden; }
+  .score-track span { display:block; height:100%; border-radius:999px; background:var(--green); }
+  .score-note { margin:10px 0 0; font-size:11px; color:var(--muted); }
   .busy-change { border-color:#d69059; background:#fffaf3; }
   .change-note { background:#fff0d7; color:#79440e; border-radius:7px; padding:8px 10px; margin-top:12px; font-size:12px; font-weight:650; }
   .funnel { padding:15px 0; }
@@ -100,6 +124,7 @@
   .empty { padding:22px 0; color:var(--muted); }
   footer { border-top:1px solid var(--line); margin-top:36px; padding-top:18px; font-size:12px; color:var(--muted); }
   [hidden] { display:none !important; }
+  @media(max-width:1000px) { .cards { grid-template-columns:1fr; } }
   @media(max-width:850px) { form { grid-template-columns:repeat(2,minmax(0,1fr)); } .results.comparing { grid-template-columns:1fr; } }
   @media(max-width:500px) { main { padding:18px 16px 36px; } .panel { padding:16px; } form { grid-template-columns:1fr; } header .eyebrow { font-size:9px; } .compare-bar label, .compare-bar button, .nl-row button { width:100%; } .hero { padding-top:26px; } }
 </style>
@@ -121,6 +146,15 @@
       </label>
       <div class="nl-row"><button id="parse" type="button" disabled>Разобрать</button><p class="meta">Город, дата, тип мероприятия, категория и бюджет нужны для подбора.</p></div>
       <div id="nl-result" class="nl-result" role="status" aria-live="polite"></div>
+    </div>
+    <div class="examples" aria-label="Примеры запросов">
+      <span class="meta">Попробуйте готовый сценарий</span>
+      <div class="example-list" id="example-list">
+        <button class="example-chip" type="button" data-example="photographers" disabled>Фотографы в Алматы</button>
+        <button class="example-chip" type="button" data-example="florists" disabled>Редкая категория</button>
+        <button class="example-chip" type="button" data-example="no-city" disabled>Нет в городе</button>
+        <button class="example-chip" type="button" data-example="compare" disabled>Сравнить даты</button>
+      </div>
     </div>
     <form id="f">
       <label>Город <select name="city" required></select></label>
@@ -158,24 +192,39 @@ const OUTCOMES = {
 const STEP_LABELS = {pool:'В городе и категории', category_city:'В городе и категории', initial:'В городе и категории',
   date:'Свободны', available:'Свободны', availability:'Свободны', budget:'В бюджете', format:'По формату',
   event_type:'По формату', language:'По языку', duration:'По длительности', ranked:'После ранжирования', top:'В подборке', shown:'Показаны'};
+const EXAMPLES = {
+  photographers: {city:'Алматы',date:'2026-10-10',event_type:'свадьба',category:'Фотограф',budget:800000},
+  florists: {city:'Алматы',date:'2026-10-10',event_type:'свадьба',category:'Флорист',budget:800000},
+  'no-city': {city:'Астана',date:'2026-10-10',event_type:'свадьба',category:'Лайв-бэнд',budget:800000},
+  compare: {city:'Алматы',date:'2026-10-10',event_type:'свадьба',category:'Фотограф',budget:800000,secondDate:'2026-12-12'}
+};
+const SCORE_PARTS = {budget:['Бюджет','40%'],relevance:['Описание и формат','30%'],hours:['Часы','15%'],language:['Язык','10%'],data_quality:['Качество данных','5%']};
 const f = document.getElementById('f'), out = document.getElementById('out');
 const status = document.getElementById('status'), submit = document.getElementById('submit');
 const compare = document.getElementById('compare'), compareDate = document.getElementById('compare-date');
 const retryMeta = document.getElementById('retry-meta'), catalogNote = document.getElementById('catalog-note');
 const nlText = document.getElementById('nl-text'), parseButton = document.getElementById('parse');
 const nlResult = document.getElementById('nl-result');
+const exampleList = document.getElementById('example-list');
 const FIELD_LABELS = {city:'город',date:'дата',event_type:'тип мероприятия',category:'категория',budget:'бюджет',duration:'длительность',language:'язык'};
 const MONTHS = {'января':1,'февраля':2,'марта':3,'апреля':4,'мая':5,'июня':6,'июля':7,'августа':8,'сентября':9,'октября':10,'ноября':11,'декабря':12};
 const field = name => f.elements.namedItem(name);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const list = value => Array.isArray(value) ? value : [];
+const numeric = value => typeof value === 'number' && Number.isFinite(value);
 const money = value => Number.isFinite(Number(value)) ? Number(value).toLocaleString('ru-RU') + ' ₸' : 'не указана';
 const dateLabel = value => /^\d{4}-\d{2}-\d{2}$/.test(value || '') ? value.split('-').reverse().join('.') : String(value || '');
+const responseTime = ms => `${(ms/1000).toLocaleString('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:ms < 10 ? 3 : 2})} с`;
 const synthetic = c => c.synthetic ? '<span class="badge synthetic">синтетический профиль</span>' : '';
 let ready = false, pending = false, parsing = false, parsedSummaryCurrent = false, lastRequest = null, generation = 0, active = null;
 let parsedGeneration = 0, parseActive = null, renderedRequests = [];
 
-function buttons() { submit.disabled = !ready || pending || parsing; compare.disabled = !ready || pending || parsing || !lastRequest; parseButton.disabled = !ready || parsing; }
+function buttons() {
+  submit.disabled = !ready || pending || parsing;
+  compare.disabled = !ready || pending || parsing || !lastRequest;
+  parseButton.disabled = !ready || parsing;
+  exampleList.querySelectorAll('button[data-example]').forEach(button => { button.disabled = !ready || pending || parsing; });
+}
 function note(text, error = false) { status.className = text ? 'notice' + (error ? ' error' : '') : ''; status.textContent = text; }
 function apiError(data) {
   if (Array.isArray(data.detail)) return data.detail.map(x => `${list(x.loc).slice(1).join('.')}: ${x.msg || 'некорректное значение'}`).join('; ');
@@ -246,10 +295,16 @@ function applyParams(params, missing = []) {
   }
   field('budget').setCustomValidity(''); field('duration').setCustomValidity('');
 }
+function foundValue(item) {
+  if (item.field === 'date') return dateLabel(item.value);
+  if (item.field === 'budget') return money(item.value);
+  if (item.field === 'duration') return `${item.value} ч`;
+  return item.value;
+}
 function parsedHTML(data) {
   const found = list(data.found), notes = list(data.notes), missing = list(data.missing);
   return `<strong>Поняли из описания</strong>${found.length ? `<ul>${found.map(x =>
-    `<li>${esc(FIELD_LABELS[x.field] || x.field)} — <strong>${esc(x.field === 'date' ? dateLabel(x.value) : x.field === 'budget' ? money(x.value) : x.value)}</strong>${x.fragment ? ` <span class="meta">(из текста: «${esc(x.fragment)}»)</span>` : ''}</li>`).join('')}</ul>` : '<p class="meta">Пока ничего не распознано.</p>'}
+    `<li>${esc(FIELD_LABELS[x.field] || x.field)} — <strong>${esc(foundValue(x))}</strong>${x.fragment ? ` <span class="meta">(из текста: «${esc(x.fragment)}»)</span>` : ''}</li>`).join('')}</ul>` : '<p class="meta">Пока ничего не распознано.</p>'}
     ${missing.length ? `<p class="missing-summary">Уточните в подсвеченных полях: ${missing.map(x => esc(FIELD_LABELS[x] || x)).join(', ')}.</p>` : '<p class="meta">Обязательные условия найдены. Проверьте поля и нажмите «Подобрать подрядчиков».</p>'}
     ${notes.length ? `<ul class="note-list">${notes.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}`;
 }
@@ -316,28 +371,76 @@ function hintHTML(hint, request) {
   return action ? `<div class="hint"><button type="button" class="hint-action" data-hint-field="${action.name}" data-hint-value="${esc(action.value)}">→ ${esc(hint)} <span>Применить</span></button></div>`
     : `<div class="hint">→ ${esc(hint)}</div>`;
 }
-function cardHTML(c, index, changed, otherDate) {
+function numericStandout(c, cards) {
+  if (cards.length < 2) return '';
+  const prices = cards.map(item => item.price_from_kzt);
+  if (prices.every(numeric) && numeric(c.price_from_kzt)) {
+    const sorted = [...prices].sort((a,b) => a-b);
+    const lowest = sorted[0], highest = sorted[sorted.length-1];
+    if (lowest < highest) {
+      if (c.price_from_kzt === lowest && sorted[1] > lowest)
+        return c.price_imputed ? 'Самая низкая оценочная цена в подборке' : 'Самая низкая цена в подборке';
+      if (c.price_from_kzt === highest && sorted[sorted.length-2] < highest)
+        return c.price_imputed ? 'Самая высокая оценочная цена в подборке' : 'Самая высокая цена в подборке';
+      if (c.price_from_kzt > lowest && c.price_from_kzt < highest) {
+        const scores = cards.map(item => item.score);
+        if (scores.every(numeric) && c.score === Math.max(...scores) && scores.filter(score => score === c.score).length === 1)
+          return 'Самый высокий рейтинг в подборке';
+        return `${c.price_imputed ? 'Оценочно: ' : ''}На ${money(c.price_from_kzt-lowest)} дороже самого доступного и на ${money(highest-c.price_from_kzt)} дешевле самого дорогого`;
+      }
+    }
+  }
+  const hours = cards.map(item => item.max_hours);
+  if (numeric(c.max_hours) && hours.filter(numeric).length >= 2 && c.max_hours === Math.max(...hours.filter(numeric)) && hours.filter(h => h === c.max_hours).length === 1)
+    return `До ${c.max_hours} ч — больше остальных с указанными часами`;
+  return '';
+}
+function standoutHTML(c, cards) {
+  const highlights = Array.isArray(c.highlights) ? c.highlights.filter(x => typeof x === 'string' && x.trim()) : null;
+  const fallback = highlights ? '' : numericStandout(c,cards);
+  const values = highlights || (fallback ? [fallback] : []);
+  return values.length ? `<div class="standout"><strong>Чем выделяется</strong><div class="tags">${values.map(x => `<span class="badge highlight">${esc(x)}</span>`).join('')}</div></div>` : '';
+}
+function scoreHTML(c) {
+  const parts = c.score_parts;
+  if (!parts || typeof parts !== 'object' || Array.isArray(parts)) return '';
+  const keys = [...Object.keys(SCORE_PARTS).filter(key => Object.hasOwn(parts,key)), ...Object.keys(parts).filter(key => !Object.hasOwn(SCORE_PARTS,key))]
+    .filter(key => numeric(parts[key]));
+  if (!keys.length) return '';
+  const total = numeric(c.score) ? `<p class="score-total">Итог: ${(c.score*100).toLocaleString('ru-RU',{maximumFractionDigits:1})} из 100</p>` : '';
+  return `<details class="score-details"><summary>Как посчитан рейтинг</summary>${total}<div class="score-list">${keys.map(key => {
+    const value = Math.max(0,Math.min(100,Math.round(parts[key]*100)));
+    const label = SCORE_PARTS[key]?.[0] || key;
+    const weight = SCORE_PARTS[key]?.[1];
+    return `<div class="score-row"><div class="score-row-head"><span>${esc(label)}${weight ? ` · вес ${weight}` : ''}</span><span>${value} из 100</span></div><div class="score-track" aria-hidden="true"><span style="width:${value}%"></span></div></div>`;
+  }).join('')}</div><p class="score-note">Взвешенная сумма, не вероятность; при равенстве — по id.</p></details>`;
+}
+function cardHTML(c, index, cards, request, changed, otherDate) {
   const source = c.explanation_source === 'llm' ? 'AI-объяснение' : c.explanation_source === 'template' ? 'Объяснение по данным' : '';
+  const share = numeric(c.price_from_kzt) && numeric(request.budget) && request.budget > 0 ? `<span class="budget-share">${Math.round(100*c.price_from_kzt/request.budget)}% бюджета</span>` : '';
+  const languages = list(c.languages).join(', ') || 'не указаны';
   return `<article class="card${changed ? ' busy-change' : ''}">
-    <div class="card-top"><span class="rank" aria-label="Место ${index+1}">${index+1}</span><div><h3>${esc(c.name)}</h3><div class="meta">${esc(c.city)} · ${esc(list(c.categories).join(', '))}</div></div></div>
-    <div class="tags">${synthetic(c)}${c.city_imputed ? '<span class="badge">город восстановлен</span>' : ''}${source ? `<span class="badge source">${source}</span>` : ''}</div>
-    <div class="price"><small>от</small> ${esc(money(c.price_from_kzt))}${c.price_imputed ? ' <span class="badge">оценочная цена</span>' : ''}</div>
-    <div class="meta">${esc(list(c.languages).join(' · '))}${c.max_hours != null ? ` · до ${esc(c.max_hours)} ч` : ''}</div>
+    <div class="card-top"><span class="rank" aria-label="Место ${index+1}">${index+1}</span><div><h3>${esc(c.name)}</h3><div class="meta">${esc(c.city)} · ${esc(list(c.categories).join(', '))}</div><div class="tags">${synthetic(c)}${c.city_imputed ? '<span class="badge">город восстановлен</span>' : ''}${source ? `<span class="badge source">${source}</span>` : ''}</div></div></div>
+    <div class="price"><small>от</small> ${esc(money(c.price_from_kzt))}${share}${c.price_imputed ? ' <span class="badge">оценочная цена</span>' : ''}</div>
+    <ul class="facts"><li>Свободен ${esc(dateLabel(request.date))}</li><li>${numeric(c.max_hours) ? `До ${esc(c.max_hours)} ч` : 'В каталоге не привязан к часам'}</li><li>Языки: ${esc(languages)}</li></ul>
+    ${standoutHTML(c,cards)}
     <div class="why"><strong>Почему этот подрядчик</strong><p>${esc(c.explanation || 'Объяснение пока недоступно.')}</p></div>
+    ${scoreHTML(c)}
     ${changed ? `<p class="change-note">На ${esc(dateLabel(otherDate))} занят — не попал в другую подборку.</p>` : ''}
   </article>`;
 }
-function resultHTML(data, request, other, otherRequest, side) {
+function resultHTML(data, request, other, otherRequest, side, elapsedMs) {
   const [kind,title] = OUTCOMES[data.outcome] || ['invalid_request','Неизвестный результат'];
   const lost = new Set(other ? busyChanges(data,other).map(c => c.id) : []);
   const arrivedBusy = new Set(other ? busyChanges(other,data).map(c => c.id) : []);
   const excluded = list(data.excluded);
+  const cards = list(data.cards);
   return `<section class="result" data-side="${side}" aria-label="Подборка на ${esc(dateLabel(request.date))}">
-    <div class="result-head"><h2>Подборка на ${esc(dateLabel(request.date))}</h2><span class="badge">${list(data.cards).length} из 3</span></div>
+    <div class="result-head"><h2>Подборка на ${esc(dateLabel(request.date))}</h2><div class="result-measure"><span class="response-time">ответ за ${responseTime(elapsedMs)}</span><span class="badge">${cards.length} из 3</span></div></div>
     <p class="meta">${esc(request.city)} · ${esc(request.category)} · ${esc(request.event_type)} · до ${esc(money(request.budget))}${request.duration ? ` · ${esc(request.duration)} ч` : ''}${request.language ? ` · ${esc(request.language)}` : ''}</p>
     <div class="outcome ${kind}"><h3>${title}</h3><div>${esc(data.message)}</div>${list(data.hints).map(h => hintHTML(h,request)).join('')}</div>
     ${funnelHTML(data)}
-    <div class="cards">${list(data.cards).map((c,i) => cardHTML(c,i,lost.has(c.id),otherRequest?.date)).join('')}</div>
+    <div class="cards">${cards.map((c,i) => cardHTML(c,i,cards,request,lost.has(c.id),otherRequest?.date)).join('')}</div>
     ${excluded.length ? `<details${arrivedBusy.size ? ' open' : ''}><summary>Не попали — почему (${excluded.length})</summary><ul class="excluded">${excluded.map(c =>
       `<li${arrivedBusy.has(c.id) ? ' class="busy-change"' : ''}><strong>${esc(c.name)}</strong> ${synthetic(c)}<p>${esc(list(c.reasons).join('; '))}</p>${arrivedBusy.has(c.id) ? '<span class="change-note">Был в подборке на другую дату; сейчас занят</span>' : ''}</li>`).join('')}</ul></details>` : ''}
   </section>`;
@@ -347,14 +450,20 @@ async function run(request, secondDate = null) {
   active?.abort(); const controller = new AbortController(); active = controller;
   const timeout = setTimeout(() => controller.abort(),45000);
   pending = true; buttons(); out.setAttribute('aria-busy','true'); note(secondDate ? 'Сравниваем одинаковые условия на две даты…' : 'Проверяем условия…');
-  const send = body => fetchJSON('/api/match',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:controller.signal});
+  const send = async body => {
+    const started = performance.now();
+    const data = await fetchJSON('/api/match',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:controller.signal});
+    return {data,elapsedMs:performance.now()-started};
+  };
   try {
     const secondRequest = secondDate ? {...request,date:secondDate} : null;
-    const results = await Promise.all(secondRequest ? [send(request),send(secondRequest)] : [send(request)]);
+    const replies = await Promise.all(secondRequest ? [send(request),send(secondRequest)] : [send(request)]);
+    const results = replies.map(reply => reply.data);
     if (current !== generation) return;
     if (results.some(d => !d || !Array.isArray(d.cards) || !d.outcome)) throw new Error('Ответ сервера не содержит результатов подбора.');
     lastRequest = {...request}; renderedRequests = secondRequest ? [request,secondRequest] : [request]; out.className = secondDate ? 'results comparing' : 'results';
-    out.innerHTML = resultHTML(results[0],request,results[1],secondRequest,0) + (secondRequest ? resultHTML(results[1],secondRequest,results[0],request,1) : '');
+    out.innerHTML = resultHTML(results[0],request,results[1],secondRequest,0,replies[0].elapsedMs) +
+      (secondRequest ? resultHTML(results[1],secondRequest,results[0],request,1,replies[1].elapsedMs) : '');
     if (secondRequest) {
       const lost = busyChanges(results[0],results[1]);
       note(lost.length ? `На ${dateLabel(secondDate)} из первой подборки заняты: ${lost.map(c => c.name).join(', ')}. Они подсвечены.` : 'Сравнение готово. Среди первой подборки нет подтверждённых исключений из-за занятости на вторую дату.');
@@ -375,6 +484,20 @@ f.addEventListener('input', event => {
   invalidateResults();
 });
 f.addEventListener('submit', event => { event.preventDefault(); cancelParse('Ручной подбор запущен. Для нового разбора нажмите «Разобрать».'); const request = readRequest(); if (request) run(request); });
+exampleList.addEventListener('click', event => {
+  const button = event.target.closest('button[data-example]');
+  if (!button || !exampleList.contains(button) || !ready || pending || parsing) return;
+  const example = EXAMPLES[button.dataset.example];
+  if (!example) return;
+  cancelParse('Выбран готовый сценарий.');
+  parsedSummaryCurrent = false; nlText.value = ''; nlResult.textContent = '';
+  clearMissing(); invalidateResults('');
+  for (const name of Object.keys(FIELD_LABELS)) field(name).value = example[name] == null ? '' : String(example[name]);
+  field('budget').setCustomValidity(''); field('duration').setCustomValidity('');
+  if (example.secondDate) { compareDate.value = example.secondDate; compareDate.setCustomValidity(''); }
+  const request = readRequest();
+  if (request) run(request,example.secondDate || null);
+});
 parseButton.addEventListener('click',parseText);
 nlText.addEventListener('keydown',event => { if (event.key === 'Enter' && event.ctrlKey) { event.preventDefault(); parseText(); } });
 nlText.addEventListener('input',() => {

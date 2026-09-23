@@ -2,7 +2,8 @@
 
 Перебирает все пары «город × категория» из каталога, все форматы, даты через каждые
 7 дней календаря и три уровня бюджета. Для каждой выдачи проверяет:
-  - карточки одного запроса не повторяют друг друга (ни целиком, ни первым предложением);
+  - карточки одного запроса не повторяют друг друга: целиком, первым предложением и «без имён»
+    (имена и номера профилей HK-… стёрты — прямое требование задания);
   - нет общих фраз из стоп-листа;
   - не больше двух предложений и не длиннее 300 символов;
   - время ответа.
@@ -41,6 +42,14 @@ def sentences(text: str) -> list[str]:
     cuts = [m.end() for m in re.finditer(r"(?<=[.!?])\s+(?=[А-ЯЁA-Z«])", masked)]
     bounds = [0, *cuts, len(text)]
     return [text[a:b].strip() for a, b in zip(bounds, bounds[1:]) if text[a:b].strip()]
+
+
+def anonymize(text: str, cards: list[dict]) -> str:
+    """Текст без имён подрядчиков выдачи и номеров профилей — как его увидит жюри, «стерев имена»."""
+    for c in cards:
+        text = text.replace(c["name"], "")
+    text = re.sub(r"(Профиль\s+)?HK-\d+:?", "", text)
+    return re.sub(r"\s+", " ", text).strip(" :")
 
 
 def main() -> int:
@@ -82,12 +91,21 @@ def main() -> int:
                     texts = [c["explanation"] for c in cards]
                     if len(set(texts)) < len(texts):
                         problems["одинаковые объяснения в одной выдаче"].append(f"{where}: {texts[0]}")
+                    # Требование задания: «если стереть имена, карточки одного запроса нельзя перепутать».
+                    # Номер профиля (HK-…) — то же имя, поэтому стираем и его.
+                    anon = [anonymize(t, cards) for t in texts]
+                    if len(cards) > 1 and len(set(anon)) < len(anon):
+                        dup = Counter(anon).most_common(1)[0][0]
+                        ids = ", ".join(c["id"] for c, a in zip(cards, anon) if a == dup)
+                        problems["без имени и номера профиля — одинаково"].append(f"{where} [{ids}]: {dup}")
                     firsts = [sentences(t)[0] if sentences(t) else t for t in texts]
                     if len(cards) > 1 and len(set(firsts)) < len(firsts):
                         dup = Counter(firsts).most_common(1)[0][0]
                         problems["одинаковое первое предложение"].append(f"{where}: {dup}")
                     for c in cards:
                         text, low = c["explanation"], c["explanation"].lower()
+                        if re.search(r"HK-\d+", text):
+                            problems["номер профиля в тексте вместо отличия"].append(f"{where} · {c['id']}: {text[:90]}")
                         hit = next((p for p in STOP_PHRASES if p in low), None)
                         if hit:
                             problems["общая фраза из стоп-листа"].append(f"{where} · {c['name']}: «{hit}»")
