@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 
 from .data import CALENDAR_END, CALENDAR_START, load_catalog
 from .matcher import MatchRequest, match
+from .nl_parse import parse_request
 
 STATIC = Path(__file__).resolve().parent.parent / "static"
 
@@ -51,6 +52,26 @@ def api_match(body: MatchIn) -> dict:
     req = MatchRequest(city=body.city, date=body.date, event_type=body.event_type, category=body.category,
                        budget=body.budget, duration=body.duration, language=body.language or None)
     return match(req, CATALOG)
+
+
+class TextIn(BaseModel):
+    text: str = Field(min_length=1, max_length=1000)
+
+
+@app.post("/api/parse")
+def api_parse(body: TextIn) -> dict:
+    """Запрос свободным текстом -> параметры формы + что откуда взято + чего не хватает."""
+    return parse_request(body.text, meta())
+
+
+@app.post("/api/ask")
+def api_ask(body: TextIn) -> dict:
+    """Разбор текста и сразу подбор, если хватает обязательных параметров."""
+    parsed = parse_request(body.text, meta())
+    if parsed["missing"]:
+        return {"parsed": parsed, "result": None}
+    p = parsed["params"]
+    return {"parsed": parsed, "result": api_match(MatchIn(**p))}
 
 
 @app.get("/")
