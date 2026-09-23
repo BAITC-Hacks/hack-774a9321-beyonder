@@ -61,7 +61,8 @@ def test_two_dates_change_results_with_busy_reason(req, catalog):
     assert "HK-27222" in {c["id"] for c in first["cards"]}
     excluded = next(c for c in second["excluded"] if c["id"] == "HK-27222")
     assert "занят 24 сентября" in excluded["reasons"]
-    assert all("23 сентября" in c["explanation"] for c in first["cards"])
+    assert "23 сентября" in first["message"]
+    assert all("23 сентября" not in c["explanation"] for c in first["cards"])
 
 
 @pytest.mark.parametrize(("changes", "outcome", "count"), [
@@ -110,13 +111,17 @@ def test_calendar_boundaries_are_inclusive(req, catalog, day):
 
 
 def test_explanations_remain_distinct_without_names(req, catalog):
-    cards = match(req, catalog)["cards"]
+    result = match(req, catalog)
+    cards = result["cards"]
     texts = [c["explanation"] for c in cards]
     for card in cards:
         texts = [text.replace(card["name"], "") for text in texts]
     assert len(texts) == len(set(texts)) == 3
     assert all(any(ch.isdigit() for ch in text) for text in texts)
-    assert any("единственный" in text for text in texts)
+    assert all(len(text) <= 220 and not text.startswith("Цена") for text in texts)
+    assert all(". Цена от " in text for text in texts)
+    assert all("Свободен" not in text and "берёт формат" not in text for text in texts)
+    assert "свободны" in result["message"] and "берут формат" in result["message"]
     assert any("дешевле" in text for text in texts)
 
 
@@ -126,7 +131,7 @@ def test_funnel_is_sequential_and_preserves_rejection_reasons(req, catalog):
     response = match(req, catalog)
     assert [s["step"] for s in response["funnel"]] == [
         "в категории и городе", "свободны 14 ноября", "в бюджете",
-        "берут формат «той»", "работают на казахском", "могут работать 6 ч",
+        "берёт формат «той»", "работает на казахском", "может работать 6 ч",
     ]
     remaining = [c for c in catalog if c.city == req.city and req.category in c.categories]
     counts = [len(remaining)]
@@ -142,6 +147,18 @@ def test_funnel_is_sequential_and_preserves_rejection_reasons(req, catalog):
     assert [s["count"] for s in response["funnel"]] == counts
     assert len(response["cards"]) == min(3, counts[-1])
     assert any(len(c["reasons"]) > 1 for c in response["excluded"])
+
+
+def test_demo_messages_use_correct_agreement(catalog):
+    base = MatchRequest("Алматы", date(2026, 10, 10), "свадьба", "Фотограф", 800_000)
+    dense = match(base, catalog)
+    rare = match(replace(base, category="Флорист"), catalog)
+    none = match(replace(base, budget=1), catalog)
+    assert "4 из 8 заняты" in dense["message"]
+    assert "1 из 2 занят" in rare["message"]
+    assert "1 берёт формат «свадьба»" == (
+        f"{rare['funnel'][-1]['count']} {rare['funnel'][-1]['step']}")
+    assert "4 из 8 заняты" in none["message"]
 
 
 def test_http_contract():
